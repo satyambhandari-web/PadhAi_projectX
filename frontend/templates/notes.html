@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes | PadhAI</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <h1>PadhAI</h1>
+        <p>AI Generated Study Notes</p>
+    </header>
+
+    <main>
+
+        <section class="notes-container">
+
+            <h2>Study Notes</h2>
+
+            <div class="notes-box">
+
+                <pre>{{ notes }}</pre>
+
+            </div>
+
+            <br>
+
+            <div class="buttons">
+
+                <a href="/upload">
+                    <button>Upload Another PDF</button>
+                </a>
+
+                <a href="/">
+                    <button>Home</button>
+                </a>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <p>© 2026 PadhAI | Smart Student Educational Content Generator</p>
+    </footer>
+
+</body>
+
+</html>

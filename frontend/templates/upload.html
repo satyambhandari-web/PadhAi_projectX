@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload PDF | PadhAI</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <h1>PadhAI</h1>
+        <p>Upload Your Study Material</p>
+    </header>
+
+    <main>
+
+        <section class="upload-container">
+
+            <h2>Upload PDF</h2>
+
+            <p>Select a PDF file and choose what you want to generate.</p>
+
+            <form action="/generate" method="POST" enctype="multipart/form-data">
+
+                <label for="pdf"><strong>Select PDF</strong></label><br><br>
+
+                <input type="file" id="pdf" name="pdf" accept=".pdf" required>
+
+                <br><br>
+
+                <label for="feature"><strong>Choose Feature</strong></label><br><br>
+
+                <select id="feature" name="feature" required>
+                    <option value="">-- Select --</option>
+                    <option value="summary">Summary</option>
+                    <option value="notes">Notes</option>
+                    <option value="flashcards">Flashcards</option>
+                    <option value="quiz">Quiz</option>
+                </select>
+
+                <br><br>
+
+                <button type="submit">
+                    Generate
+                </button>
+
+            </form>
+
+            <br>
+
+            <a href="/">← Back to Home</a>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <p>© 2026 PadhAI | Smart Student Educational Content Generator</p>
+    </footer>
+
+</body>
+
+</html>

@@ -1,0 +1,179 @@
+/* Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background: #f4f7fc;
+    color: #333;
+}
+
+/* Header */
+
+header {
+    background: #2d6cdf;
+    color: white;
+    text-align: center;
+    padding: 25px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+header h1 {
+    font-size: 40px;
+}
+
+header p {
+    margin-top: 8px;
+    font-size: 18px;
+}
+
+/* Main */
+
+main {
+    width: 90%;
+    max-width: 1000px;
+    margin: 40px auto;
+}
+
+/* Sections */
+
+section {
+    background: white;
+    padding: 30px;
+    margin-bottom: 30px;
+    border-radius: 12px;
+    box-shadow: 0 5px 12px rgba(0, 0, 0, .1);
+}
+
+section h2 {
+    color: #2d6cdf;
+    margin-bottom: 20px;
+}
+
+/* Upload Form */
+
+input[type=file],
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+button {
+    background: #2d6cdf;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: .3s;
+}
+
+button:hover {
+    background: #1d4fb5;
+}
+
+/* Feature Cards */
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: #eef4ff;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    transition: .3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card h3 {
+    color: #2d6cdf;
+    margin-bottom: 10px;
+}
+
+/* Output Boxes */
+
+.summary-box,
+.notes-box,
+.quiz-box,
+.flashcards-box {
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 20px;
+    min-height: 250px;
+}
+
+pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+/* Buttons */
+
+.buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.buttons a {
+    text-decoration: none;
+}
+
+/* Links */
+
+a {
+    color: #2d6cdf;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Footer */
+
+footer {
+    background: #2d6cdf;
+    color: white;
+    text-align: center;
+    padding: 18px;
+    margin-top: 40px;
+}
+
+/* Mobile */
+
+@media(max-width:768px) {
+
+    header h1 {
+        font-size: 30px;
+    }
+
+    section {
+        padding: 20px;
+    }
+
+    button {
+        width: 100%;
+    }
+
+}
