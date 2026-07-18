@@ -1,5 +1,7 @@
-.env
-/rag_chroma_db
-/uploads
-__pycache__
-/.venv/
+.env/
+rag_chroma_db/
+uploads
+__pycache__/
+.venv/
+frontend/
+generated/
