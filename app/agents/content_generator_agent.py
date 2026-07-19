@@ -1,12 +1,11 @@
 import os
 
-from dotenv import load_dotenv
-
 from langchain_groq import ChatGroq
-from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage, ToolMessage
-
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
 from app.services.rag_service import RAGService
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -118,16 +117,12 @@ if __name__ == "__main__":
             )
         ]
     }
-
-    # LLM decides whether to call the tool
     response = agent.agent_node(state)
 
     print("===== AGENT RESPONSE =====")
     print(response)
 
-    # If tool call exists, execute it
-    if response["messages"][0].tool_calls:
-
+    if response["messages"][0].tool_calls: 
         tool_response = agent.tool_node(response)
 
         print("\n===== TOOL RESPONSE =====")

@@ -1,5 +1,4 @@
 import os
-from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import PyPDFLoader
@@ -7,6 +6,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_classic.chains import RetrievalQA
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -89,7 +90,6 @@ class RAGService:
             search_kwargs={"k": 4}
         )
 
-    # This method is used by your agents
     def get_retriever(self):
         return self.create_retriever()
 
@@ -125,8 +125,7 @@ class RAGService:
 if __name__ == "__main__":
 
     rag_service = RAGService()
-
-    # Run only once for a new PDF
+     
     rag_service.generate_and_store_embeddings()
 
     result = rag_service.create_rag_chain(
