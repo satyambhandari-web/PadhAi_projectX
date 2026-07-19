@@ -1,6 +1,6 @@
-.env/
+.env
 rag_chroma_db/
-uploads
+uploads/
 __pycache__/
 .venv/
 frontend/
