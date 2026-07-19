@@ -1,4 +1,4 @@
-.env/
+.env 
 rag_chroma_db/
 uploads
 __pycache__/
