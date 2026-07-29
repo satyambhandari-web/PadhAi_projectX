@@ -130,3 +130,15 @@ async def settings(request: Request):
         request=request,
         name="settings.html",
     )
+@app.get("/result")
+def result(request: Request):
+    return templates.TemplateResponse(
+        "result.html",
+        {"request": request}
+    )
+@app.get("/about")
+async def about(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="about.html"
+    )
