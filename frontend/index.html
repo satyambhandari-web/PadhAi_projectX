@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PadhAi — Smart Student Educational Content Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body data-theme="light">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" width="26" height="26">
+          <path d="M8 30 L8 10 Q8 6 12 6 L28 6 Q32 6 32 10 L32 30" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M20 6 L20 34" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+          <path d="M20 13 L26 10.5 M20 18 L27 15.5 M20 23 L26 20.5" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" />
+          <circle cx="31" cy="9" r="2.6" fill="currentColor" />
+        </svg>
+      </span>
+      <div class="brand-text">
+        <span class="brand-name">Padh<span class="brand-accent">Ai</span></span>
+        <span class="brand-tag">Study, sharper.</span>
+      </div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">✕</button>
+    </div>
+
+    <nav class="nav" aria-label="Primary">
+      <button class="nav-item is-active" data-view="dashboard">
+        <span class="nav-icon">▤</span><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="materials">
+        <span class="nav-icon">▥</span><span>Materials</span>
+      </button>
+      <button class="nav-item" data-view="summary">
+        <span class="nav-icon">≣</span><span>Summary</span>
+      </button>
+      <button class="nav-item" data-view="notes">
+        <span class="nav-icon">✎</span><span>Notes</span>
+      </button>
+      <button class="nav-item" data-view="quiz">
+        <span class="nav-icon">◈</span><span>Quiz</span>
+      </button>
+      <button class="nav-item" data-view="flashcards">
+        <span class="nav-icon">▭</span><span>Flashcards</span>
+      </button>
+      <button class="nav-item" data-view="chat">
+        <span class="nav-icon">◔</span><span>AI Chat</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <span class="nav-icon">⚙</span><span>Settings</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="usage-card">
+        <div class="usage-head">
+          <span>Monthly usage</span>
+          <span class="usage-value">64%</span>
+        </div>
+        <div class="usage-bar">
+          <div class="usage-bar-fill" style="width:64%"></div>
+        </div>
+        <p class="usage-note">32 of 50 generations used</p>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+      <div class="topbar-title">
+        <h1 id="viewTitle">Dashboard</h1>
+        <p id="viewSubtitle">Your learning, distilled by AI.</p>
+      </div>
+      <div class="topbar-actions">
+        <div class="search-box">
+          <span class="search-icon">⌕</span>
+          <input type="text" placeholder="Search materials, notes, chats…" id="globalSearch">
+        </div>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+          <span class="theme-toggle-track">
+            <span class="theme-toggle-thumb">
+              <span class="theme-icon sun">☀</span>
+              <span class="theme-icon moon">☾</span>
+            </span>
+          </span>
+        </button>
+        <div class="avatar" title="Ananya Rao">AR</div>
+      </div>
+    </header>
+
+    <main class="content" id="content">
+
+      <!-- ---------- DASHBOARD ---------- -->
+      <section class="view is-active" id="view-dashboard">
+        <div class="hero">
+          <div class="hero-glow" aria-hidden="true"></div>
+          <div class="hero-body">
+            <span class="eyebrow">Welcome back</span>
+            <h2>Good evening, Ananya. Ready to turn today's reading into knowledge?</h2>
+            <p>Drop in a chapter, a PDF, or your class notes — PadhAi will summarise it, quiz you on it, and hold what
+              you've learned in one place.</p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" data-goto="materials">+ Add material</button>
+              <button class="btn btn-ghost" data-goto="chat">Ask PadhAi something</button>
+            </div>
+          </div>
+          <div class="hero-ring" aria-hidden="true">
+            <svg viewBox="0 0 140 140" width="140" height="140">
+              <circle cx="70" cy="70" r="60" fill="none" stroke="var(--border)" stroke-width="10" />
+              <circle cx="70" cy="70" r="60" fill="none" stroke="url(#ringGrad)" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="98" transform="rotate(-90 70 70)" />
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="var(--gold-light)" />
+                  <stop offset="1" stop-color="var(--gold)" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="hero-ring-label">
+              <strong>74%</strong>
+              <span>Weekly goal</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="dash-columns">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Recent materials</h3>
+              <button class="link-btn" data-goto="materials">View all</button>
+            </div>
+            <div class="recent-list" id="recentList"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Quick actions</h3>
+            </div>
+            <div class="quick-actions">
+              <button class="quick-action" data-goto="summary">
+                <span class="qa-icon">≣</span>
+                <div><strong>Summarise a chapter</strong><small>Get a crisp AI summary</small></div>
+              </button>
+              <button class="quick-action" data-goto="quiz">
+                <span class="qa-icon">◈</span>
+                <div><strong>Take a quiz</strong><small>Test what you remember</small></div>
+              </button>
+              <button class="quick-action" data-goto="flashcards">
+                <span class="qa-icon">▭</span>
+                <div><strong>Review flashcards</strong><small>Spaced-repetition ready</small></div>
+              </button>
+              <button class="quick-action" data-goto="notes">
+                <span class="qa-icon">✎</span>
+                <div><strong>Generate notes</strong><small>Structured study notes</small></div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- MATERIALS ---------- -->
+      <section class="view" id="view-materials">
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" hidden multiple accept=".pdf,.doc,.docx,.txt">
+          <div class="dropzone-icon">⇪</div>
+          <h3>Drag &amp; drop your PDF or document</h3>
+          <p>or <button class="link-btn" id="browseBtn">browse from your device</button> · PDF, DOCX, TXT up to 25MB</p>
+          <div class="upload-progress" id="uploadProgress" hidden>
+            <div class="upload-progress-bar">
+              <div class="upload-progress-fill" id="uploadProgressFill"></div>
+            </div>
+            <span id="uploadProgressLabel">Uploading chapter-4-thermodynamics.pdf…</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Your materials</h3>
+            <span class="chip" id="materialsCount">0 files</span>
+          </div>
+          <div class="materials-grid" id="materialsGrid"></div>
+          <div class="empty-state" id="materialsEmpty" hidden>
+            <div class="empty-icon">▥</div>
+            <h4>No materials yet</h4>
+            <p>Upload your first PDF or document to let PadhAi start generating summaries, notes and quizzes.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- SUMMARY ---------- -->
+      <section class="view" id="view-summary">
+        <div class="panel generator-panel">
+          <div class="panel-head">
+            <h3>Summary generator</h3>
+          </div>
+          <p class="panel-desc">Pick a material and PadhAi will condense it into a clean, readable summary.</p>
+          <div class="generator-controls">
+            <select id="summaryMaterialSelect" class="select"></select>
+            <button class="btn btn-primary" id="summaryGenerateBtn">Generate summary</button>
+          </div>
+          <div class="generator-output" id="summaryOutput">
+            <div class="empty-state">
+              <div class="empty-icon">≣</div>
+              <h4>Nothing summarised yet</h4>
+              <p>Choose a material above and generate your first AI summary.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- NOTES ---------- -->
+      <section class="view" id="view-notes">
+        <div class="panel generator-panel">
+          <div class="panel-head">
+            <h3>Notes generator</h3>
+          </div>
+          <p class="panel-desc">Turn any material into structured, exam-ready notes with key terms called out.</p>
+          <div class="generator-controls">
+            <select id="notesMaterialSelect" class="select"></select>
+            <button class="btn btn-primary" id="notesGenerateBtn">Generate notes</button>
+          </div>
+          <div class="generator-output" id="notesOutput">
+            <div class="empty-state">
+              <div class="empty-icon">✎</div>
+              <h4>No notes yet</h4>
+              <p>Choose a material above and generate structured study notes.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- QUIZ ---------- -->
+      <section class="view" id="view-quiz">
+        <div class="panel generator-panel">
+          <div class="panel-head">
+            <h3>MCQ quiz</h3>
+          </div>
+          <p class="panel-desc">Test your understanding with an auto-generated multiple-choice quiz.</p>
+          <div class="generator-controls" id="quizSetup">
+            <select id="quizMaterialSelect" class="select"></select>
+            <button class="btn btn-primary" id="quizGenerateBtn">Start quiz</button>
+          </div>
+
+          <div class="quiz-box" id="quizBox" hidden>
+            <div class="quiz-progress">
+              <span id="quizProgressLabel">Question 1 of 5</span>
+              <div class="quiz-progress-bar">
+                <div class="quiz-progress-fill" id="quizProgressFill"></div>
+              </div>
+            </div>
+            <h3 class="quiz-question" id="quizQuestion"></h3>
+            <div class="quiz-options" id="quizOptions"></div>
+            <div class="quiz-nav">
+              <button class="btn btn-ghost" id="quizPrevBtn">Back</button>
+              <button class="btn btn-primary" id="quizNextBtn">Next question</button>
+            </div>
+          </div>
+
+          <div class="quiz-result" id="quizResult" hidden>
+            <div class="score-ring">
+              <svg viewBox="0 0 140 140" width="140" height="140">
+                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--border)" stroke-width="10" />
+                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--gold)" stroke-width="10" stroke-linecap="round"
+                  id="scoreRingCircle" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 70 70)" />
+              </svg>
+              <div class="score-ring-label"><strong id="scorePercent">0%</strong><span id="scoreFraction">0 / 5</span>
+              </div>
+            </div>
+            <h3>Nice work, Ananya.</h3>
+            <p id="scoreMessage">Here's how you did.</p>
+            <button class="btn btn-primary" id="quizRetakeBtn">Retake quiz</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- FLASHCARDS ---------- -->
+      <section class="view" id="view-flashcards">
+        <div class="panel generator-panel">
+          <div class="panel-head">
+            <h3>Flashcards</h3>
+          </div>
+          <p class="panel-desc">Flip through AI-generated flashcards. Click a card to reveal the answer.</p>
+          <div class="generator-controls">
+            <select id="flashMaterialSelect" class="select"></select>
+            <button class="btn btn-primary" id="flashGenerateBtn">Generate deck</button>
+          </div>
+
+          <div class="flash-deck" id="flashDeck" hidden>
+            <div class="flash-meta">
+              <span id="flashCounter">Card 1 of 8</span>
+              <button class="link-btn" id="flashShuffleBtn">Shuffle deck</button>
+            </div>
+            <div class="flashcard" id="flashcard">
+              <div class="flashcard-inner" id="flashcardInner">
+                <div class="flashcard-face flashcard-front">
+                  <span class="flashcard-tag">Term</span>
+                  <p id="flashFrontText"></p>
+                  <span class="flashcard-hint">Tap to flip</span>
+                </div>
+                <div class="flashcard-face flashcard-back">
+                  <span class="flashcard-tag">Answer</span>
+                  <p id="flashBackText"></p>
+                  <span class="flashcard-hint">Tap to flip back</span>
+                </div>
+              </div>
+            </div>
+            <div class="flash-controls">
+              <button class="btn btn-ghost" id="flashPrevBtn">← Previous</button>
+              <button class="btn btn-primary" id="flashNextBtn">Next →</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- AI CHAT ---------- -->
+      <section class="view" id="view-chat">
+        <div class="panel chat-panel">
+          <div class="panel-head">
+            <h3>AI Chat</h3>
+            <span class="chip chip-live">● Online</span>
+          </div>
+          <div class="chat-window" id="chatWindow"></div>
+          <div class="chat-typing" id="chatTyping" hidden>
+            <span></span><span></span><span></span> PadhAi is thinking
+          </div>
+          <form class="chat-input-row" id="chatForm">
+            <input type="text" id="chatInput"
+              placeholder="Ask about your materials, request a summary, or quiz yourself…" autocomplete="off">
+            <button type="submit" class="btn btn-primary" id="chatSendBtn">Send</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ---------- SETTINGS ---------- -->
+      <section class="view" id="view-settings">
+        <div class="settings-grid">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Profile</h3>
+            </div>
+            <div class="profile-row">
+              <div class="avatar avatar-lg">AR</div>
+              <div>
+                <strong>Ananya Rao</strong>
+                <p>ananya.rao@student.edu · B.Tech, Semester 5</p>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label>Full name<input type="text" class="text-input" value="Ananya Rao"></label>
+              <label>Email<input type="email" class="text-input" value="ananya.rao@student.edu"></label>
+              <label>Institution<input type="text" class="text-input"
+                  value="Vidyasagar Institute of Technology"></label>
+              <label>Course<input type="text" class="text-input" value="B.Tech, Computer Science"></label>
+            </div>
+            <button class="btn btn-primary" id="saveProfileBtn">Save changes</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Appearance</h3>
+            </div>
+            <div class="setting-row">
+              <div>
+                <strong>Dark mode</strong>
+                <p>Switch between golden-light and charcoal-gold themes.</p>
+              </div>
+              <button class="switch" id="settingsThemeSwitch" role="switch" aria-checked="false">
+                <span class="switch-thumb"></span>
+              </button>
+            </div>
+            <div class="setting-row">
+              <div>
+                <strong>Compact sidebar</strong>
+                <p>Collapse labels to icons only.</p>
+              </div>
+              <button class="switch" id="compactSwitch" role="switch" aria-checked="false">
+                <span class="switch-thumb"></span>
+              </button>
+            </div>
+            <div class="panel-head" style="margin-top:1.5rem;">
+              <h3>Notifications</h3>
+            </div>
+            <div class="setting-row">
+              <div>
+                <strong>Email digests</strong>
+                <p>Weekly summary of your study activity.</p>
+              </div>
+              <button class="switch is-on" id="digestSwitch" role="switch" aria-checked="true">
+                <span class="switch-thumb"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <script src="js/script.js"></script>
+</body>
+
+</html>
