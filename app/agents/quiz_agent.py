@@ -5,10 +5,15 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from app.services.rag_service import RAGService
+from app.services.llm_service import LLMService
 from dotenv import load_dotenv
 
 load_dotenv()
 
+llm = LLMService(
+    model_name="llama-3.3-70b-versatile",
+    temperature=0.5
+).get_llm()
 
 @tool
 def get_quiz_content(query: str):

@@ -337,13 +337,13 @@ screenshots/
 # 👨‍💻 Team
 
 
-### Team Capable
+### Team Trios Ai Trinity
 
 Developed by:
 
-- Satyam
-- Om
-- Ritesh
+- Satyam .P. Bhandari
+- Om .G. Sonar
+- Ritesh .P. Chaudhary
 
 
 B.Tech Computer Science Engineering  
@@ -370,12 +370,3 @@ Contributions are welcome!
 
 
 This project is created for educational purposes.
-
-
----
-
-<p align="center">
-
-Made with ❤️ using Python, LangChain, RAG & Generative AI
-
-</p>
