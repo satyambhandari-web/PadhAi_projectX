@@ -1,144 +1,170 @@
 from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+
+# ============================================================
+# PATH CONFIGURATION
+# ============================================================
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-app = FastAPI(title="PadhAi")
+FRONTEND_DIR = BASE_DIR / "frontend"
+STATIC_DIR = FRONTEND_DIR / "static"
+TEMPLATES_DIR = FRONTEND_DIR / "templates"
 
-# Static files
+
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
+
+app = FastAPI(
+    title="PadhAi",
+    description="AI-powered educational content generation platform",
+    version="1.0.0",
+)
+
+
+# ============================================================
+# STATIC FILES
+# ============================================================
+
 app.mount(
     "/static",
-    StaticFiles(directory=BASE_DIR / "frontend" / "static"),
+    StaticFiles(directory=STATIC_DIR),
     name="static",
 )
 
-# Templates
+
+# ============================================================
+# JINJA2 TEMPLATES
+# ============================================================
+
 templates = Jinja2Templates(
-    directory=str(BASE_DIR / "frontend" / "templates")
+    directory=str(TEMPLATES_DIR)
 )
 
 
-@app.get("/")
-async def home(request: Request):
+# ============================================================
+# HELPER FUNCTION
+# ============================================================
+
+def render_page(request: Request, page: str):
+    """
+    Render a frontend HTML page.
+    """
+
     return templates.TemplateResponse(
         request=request,
-        name="index.html",
+        name=page,
     )
+
+
+# ============================================================
+# MAIN PAGES
+# ============================================================
+
+@app.get("/")
+async def home(request: Request):
+    return render_page(request, "index.html")
 
 
 @app.get("/login")
 async def login(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-    )
+    return render_page(request, "login.html")
 
 
 @app.get("/signup")
 async def signup(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="signup.html",
-    )
+    return render_page(request, "signup.html")
 
 
 @app.get("/dashboard")
 async def dashboard(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html",
-    )
+    return render_page(request, "dashboard.html")
 
+
+# ============================================================
+# DOCUMENT / STUDY FLOW
+# ============================================================
 
 @app.get("/upload")
 async def upload(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="upload.html",
-    )
+    return render_page(request, "upload.html")
 
 
 @app.get("/processing")
 async def processing(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="processing.html",
-    )
+    return render_page(request, "processing.html")
 
+
+@app.get("/result")
+async def result(request: Request):
+    return render_page(request, "result.html")
+
+
+# ============================================================
+# GENERATED CONTENT
+# ============================================================
 
 @app.get("/summary")
 async def summary(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="summary.html",
-    )
+    return render_page(request, "summary.html")
 
 
 @app.get("/notes")
 async def notes(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="notes.html",
-    )
+    return render_page(request, "notes.html")
 
 
 @app.get("/quiz")
 async def quiz(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="quiz.html",
-    )
+    return render_page(request, "quiz.html")
 
 
 @app.get("/flashcards")
 async def flashcards(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="flashcards.html",
-    )
+    return render_page(request, "flashcards.html")
 
+
+# ============================================================
+# OTHER APPLICATION PAGES
+# ============================================================
 
 @app.get("/chat")
 async def chat(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="chat.html",
-    )
+    return render_page(request, "chat.html")
 
 
 @app.get("/history")
 async def history(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="history.html",
-    )
+    return render_page(request, "history.html")
 
 
 @app.get("/profile")
 async def profile(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="profile.html",
-    )
+    return render_page(request, "profile.html")
 
 
 @app.get("/settings")
 async def settings(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="settings.html",
-    )
-@app.get("/result")
-def result(request: Request):
-    return templates.TemplateResponse(
-        "result.html",
-        {"request": request}
-    )
+    return render_page(request, "settings.html")
+
+
 @app.get("/about")
 async def about(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="about.html"
-    )
+    return render_page(request, "about.html")
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "application": "PadhAi",
+    }

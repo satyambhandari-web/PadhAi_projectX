@@ -2,7 +2,11 @@ import os
 
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import (
+    SystemMessage,
+    HumanMessage,
+    ToolMessage,
+)
 from langchain_core.tools import tool
 
 from app.services.rag_service import RAGService
@@ -12,14 +16,14 @@ load_dotenv()
 
 
 # ============================================================
-# TOOL: Retrieve relevant study material
+# TOOL: RETRIEVE RELEVANT STUDY MATERIAL
 # ============================================================
 
 @tool
-def get_quiz_content(query: str):
+def get_quiz_content(query: str) -> str:
     """
-    Retrieves relevant educational content from the vector database
-    for generating quiz questions.
+    Retrieve relevant educational content from the PadhAi
+    RAG/vector database for generating quiz questions.
     """
 
     rag_service = RAGService()
@@ -28,12 +32,14 @@ def get_quiz_content(query: str):
 
     documents = retriever.invoke(query)
 
-    # Return ONLY useful text.
-    # Do not return complete Document objects with metadata.
+    if not documents:
+        return "No relevant educational material was found."
+
     content = []
 
     for doc in documents:
-        content.append(doc.page_content)
+        if hasattr(doc, "page_content") and doc.page_content:
+            content.append(doc.page_content)
 
     return "\n\n".join(content)
 
@@ -50,47 +56,66 @@ class QuizAgent:
             model="openai/gpt-oss-120b",
             temperature=0.2,
             max_tokens=2048,
-            api_key=os.getenv("GROQ_API_KEY")
+            api_key=os.getenv("GROQ_API_KEY"),
         )
 
-        # Tool-enabled LLM
-        self.tools = [get_quiz_content]
+        # ----------------------------------------------------
+        # Tools
+        # ----------------------------------------------------
+
+        self.tools = [
+            get_quiz_content
+        ]
 
         self.tools_by_names = {
-            t.name: t
-            for t in self.tools
+            tool_function.name: tool_function
+            for tool_function in self.tools
         }
 
-        self.llm_with_tools = self.llm.bind_tools(self.tools)
+        self.llm_with_tools = self.llm.bind_tools(
+            self.tools
+        )
 
 
     # ========================================================
-    # STEP 1: ASK LLM TO RETRIEVE CONTENT
+    # AGENT NODE
     # ========================================================
 
     def agent_node(self, state: dict) -> dict:
+        """
+        Ask the LLM to decide whether educational content
+        needs to be retrieved.
+        """
 
         messages = state["messages"]
 
         system_prompt = SystemMessage(
             content="""
-You are an expert university professor.
+You are PadhAi's Quiz Agent.
 
-You are preparing a quiz for an engineering student.
+You are an expert university professor who creates
+exam-oriented quizzes for engineering students.
 
-IMPORTANT:
+Your job at this stage is ONLY to retrieve the relevant
+educational material.
 
-1. ALWAYS use the get_quiz_content tool first.
-2. Retrieve educational material relevant to the user's topic.
-3. Do not answer the quiz yet.
-4. After retrieving the content, the application will generate
-   the final quiz separately.
+IMPORTANT RULES:
+
+1. ALWAYS call get_quiz_content before generating a quiz.
+2. Retrieve material relevant to the user's requested topic.
+3. Do not generate the final quiz in this node.
+4. Do not use outside knowledge.
+5. The final quiz will be generated after retrieval.
 """
         )
 
-        full_messages = [system_prompt] + messages
+        full_messages = [
+            system_prompt
+        ] + messages
 
-        response = self.llm_with_tools.invoke(full_messages)
+        response = self.llm_with_tools.invoke(
+            full_messages
+        )
 
         return {
             "messages": [response]
@@ -98,81 +123,188 @@ IMPORTANT:
 
 
     # ========================================================
-    # STEP 2: EXECUTE TOOL
+    # TOOL NODE
     # ========================================================
 
-    def tool_node(self, state: dict) -> str:
+    def tool_node(self, state: dict) -> dict:
+        """
+        Execute the requested tool and return the result
+        as a LangGraph state update.
+
+        IMPORTANT:
+        LangGraph nodes MUST return dictionaries.
+        """
 
         messages = state["messages"]
 
         last_message = messages[-1]
 
-        if not last_message.tool_calls:
-            return ""
+        # ----------------------------------------------------
+        # No tool call
+        # ----------------------------------------------------
+
+        if not getattr(last_message, "tool_calls", None):
+
+            return {
+                "messages": []
+            }
+
+        # ----------------------------------------------------
+        # Execute the first tool call
+        # ----------------------------------------------------
 
         tool_call = last_message.tool_calls[0]
 
         tool_name = tool_call["name"]
 
-        tool_args = tool_call["args"]
+        tool_args = tool_call.get(
+            "args",
+            {}
+        )
 
-        tool_function = self.tools_by_names.get(tool_name)
+        tool_function = self.tools_by_names.get(
+            tool_name
+        )
 
-        if not tool_function:
-            return f"Error: Tool {tool_name} not found"
+        # ----------------------------------------------------
+        # Tool not found
+        # ----------------------------------------------------
 
-        result = tool_function.invoke(tool_args)
+        if tool_function is None:
 
-        return str(result)
+            tool_message = ToolMessage(
+                content=f"Tool '{tool_name}' was not found.",
+                tool_call_id=tool_call["id"],
+                name=tool_name,
+            )
+
+            return {
+                "messages": [
+                    tool_message
+                ]
+            }
+
+        # ----------------------------------------------------
+        # Execute tool
+        # ----------------------------------------------------
+
+        try:
+
+            result = tool_function.invoke(
+                tool_args
+            )
+
+            result = str(result)
+
+        except Exception as error:
+
+            result = (
+                f"Error while retrieving quiz content: "
+                f"{str(error)}"
+            )
+
+        # ----------------------------------------------------
+        # Convert result to ToolMessage
+        # ----------------------------------------------------
+
+        tool_message = ToolMessage(
+            content=result,
+            tool_call_id=tool_call["id"],
+            name=tool_name,
+        )
+
+        # ----------------------------------------------------
+        # IMPORTANT:
+        # Return state dictionary, NOT raw string
+        # ----------------------------------------------------
+
+        return {
+            "messages": [
+                tool_message
+            ]
+        }
 
 
     # ========================================================
-    # STEP 3: GENERATE FINAL QUIZ
+    # FINAL QUIZ GENERATOR
     # ========================================================
 
     def generate_final_quiz(
         self,
         topic: str,
         retrieved_content: str,
-        number_of_questions: int = 10
-    ):
+        number_of_questions: int = 10,
+    ) -> str:
 
-        # Safety limit to prevent Groq request-size errors.
-        #
-        # Approximately 5000-6000 characters keeps the request
-        # comfortably below the 8000 TPM limit in normal usage.
+        # ----------------------------------------------------
+        # Validate question count
+        # ----------------------------------------------------
 
-        max_chars = 14000
+        if number_of_questions < 1:
+            number_of_questions = 1
+
+        if number_of_questions > 20:
+            number_of_questions = 20
+
+        # ----------------------------------------------------
+        # Limit retrieved context
+        # ----------------------------------------------------
+
+        max_chars = 6500
 
         if len(retrieved_content) > max_chars:
-            retrieved_content = retrieved_content[:max_chars]
+
+            retrieved_content = (
+                retrieved_content[:max_chars]
+            )
+
+        # ----------------------------------------------------
+        # Final generation prompt
+        # ----------------------------------------------------
 
         system_prompt = SystemMessage(
             content=f"""
-You are an expert university professor creating an
-exam-oriented quiz.
+You are PadhAi's Quiz Generator.
 
-Create EXACTLY {number_of_questions} multiple-choice questions
-from the educational material provided below.
+You are an expert university professor creating an
+exam-oriented quiz for engineering students.
+
+Create EXACTLY {number_of_questions} multiple-choice
+questions about:
+
+{topic}
+
+Use ONLY the educational material provided below.
 
 STRICT RULES:
 
-1. Use ONLY the provided educational material.
-2. Do not use outside knowledge.
-3. Do not invent information.
-4. Every question must be related to the provided material.
-5. Each question must have exactly four options.
-6. Options must be A, B, C and D.
-7. Give the correct answer.
-8. Give a short explanation.
-9. Avoid duplicate questions.
-10. Focus on important exam-relevant concepts.
-11. Keep questions clear and easy to understand.
-12. Do not mention RAG, tools, vector databases, or internal
-    processing.
-13. Do not add introductory conversational text.
+1. Use ONLY the supplied educational material.
+2. Do NOT use outside knowledge.
+3. Do NOT invent facts.
+4. Every question must be related to the requested topic.
+5. Create exactly {number_of_questions} questions.
+6. Each question must have exactly four options.
+7. Options must be A, B, C and D.
+8. There must be exactly one correct answer.
+9. Provide the correct answer.
+10. Provide a short explanation.
+11. Avoid duplicate questions.
+12. Focus on important exam-relevant concepts.
+13. Mix conceptual and application-based questions when
+    the source material supports them.
+14. Keep the questions appropriate for an engineering student.
+15. Do not mention RAG.
+16. Do not mention vector databases.
+17. Do not mention tools.
+18. Do not mention internal processing.
+19. Do not add conversational introduction or conclusion.
 
-FORMAT EXACTLY LIKE THIS:
+IMPORTANT:
+
+Every question must be answerable using ONLY the provided
+educational material.
+
+FORMAT:
 
 # Quiz - {topic}
 
@@ -210,23 +342,36 @@ FORMAT EXACTLY LIKE THIS:
 
 **Explanation:** [short explanation]
 
-Continue until exactly {number_of_questions} questions
-are generated.
+Continue until exactly {number_of_questions}
+questions are generated.
 """
         )
 
         user_message = HumanMessage(
             content=f"""
-Topic: {topic}
+Topic:
+{topic}
 
 Educational Material:
+----------------------------------------
 
 {retrieved_content}
+
+----------------------------------------
+
+Generate the final quiz now.
 """
         )
 
+        # ----------------------------------------------------
+        # Generate final quiz
+        # ----------------------------------------------------
+
         response = self.llm.invoke(
-            [system_prompt, user_message]
+            [
+                system_prompt,
+                user_message,
+            ]
         )
 
         return response.content
@@ -239,9 +384,9 @@ Educational Material:
 if __name__ == "__main__":
 
     print()
-    print("========================================")
-    print("          QUIZ AGENT STARTED")
-    print("========================================")
+    print("=" * 60)
+    print("                 PADHAI QUIZ AGENT")
+    print("=" * 60)
     print()
 
     agent = QuizAgent()
@@ -251,53 +396,104 @@ if __name__ == "__main__":
     state = {
         "messages": [
             HumanMessage(
-                content=f"Create a quiz on {topic}."
+                content=f"""
+Create a quiz on {topic}.
+"""
             )
         ]
     }
 
-    # --------------------------------------------------------
-    # STEP 1
-    # --------------------------------------------------------
+    # ========================================================
+    # STEP 1 — AGENT
+    # ========================================================
 
-    response = agent.agent_node(state)
+    print("===== STEP 1: QUIZ AGENT =====")
+    print()
 
-    print("===== AGENT RESPONSE =====")
-    print(response)
+    response = agent.agent_node(
+        state
+    )
 
-    # --------------------------------------------------------
-    # STEP 2
-    # --------------------------------------------------------
+    print("Agent response generated.")
 
-    if response["messages"][0].tool_calls:
+    # ========================================================
+    # STEP 2 — RETRIEVE CONTENT
+    # ========================================================
 
-        print()
-        print("===== RETRIEVING CONTENT =====")
-        print()
+    if response["messages"]:
 
-        retrieved_content = agent.tool_node(response)
+        assistant_message = response["messages"][0]
 
-        print("Educational content retrieved successfully.")
+        if getattr(
+            assistant_message,
+            "tool_calls",
+            None,
+        ):
 
-        # ----------------------------------------------------
-        # STEP 3
-        # ----------------------------------------------------
+            print()
+            print("===== STEP 2: RETRIEVING EDUCATIONAL CONTENT =====")
+            print()
 
-        print()
-        print("========================================")
-        print("             FINAL QUIZ")
-        print("========================================")
-        print()
+            tool_result = agent.tool_node(
+                {
+                    "messages": response["messages"]
+                }
+            )
 
-        final_quiz = agent.generate_final_quiz(
-            topic=topic,
-            retrieved_content=retrieved_content,
-            number_of_questions=10
-        )
+            # ------------------------------------------------
+            # Extract ToolMessage content
+            # ------------------------------------------------
 
-        print(final_quiz)
+            if tool_result["messages"]:
+
+                retrieved_content = (
+                    tool_result["messages"][0].content
+                )
+
+            else:
+
+                retrieved_content = ""
+
+            if retrieved_content:
+
+                print(
+                    "Educational content retrieved successfully."
+                )
+
+            else:
+
+                print(
+                    "WARNING: No educational content retrieved."
+                )
+
+            # =================================================
+            # STEP 3 — FINAL QUIZ
+            # =================================================
+
+            print()
+            print("=" * 60)
+            print("                    FINAL QUIZ")
+            print("=" * 60)
+            print()
+
+            final_quiz = agent.generate_final_quiz(
+                topic=topic,
+                retrieved_content=retrieved_content,
+                number_of_questions=10,
+            )
+
+            print(final_quiz)
+
+        else:
+
+            print()
+            print(
+                "ERROR: Quiz retrieval tool was not called."
+            )
 
     else:
 
         print()
-        print("ERROR: Quiz content retrieval tool was not called.")
+        print(
+            "ERROR: Quiz agent returned no messages."
+        )
