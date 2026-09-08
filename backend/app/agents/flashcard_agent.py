@@ -9,10 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# ============================================================
-# TOOL: Retrieve educational content from RAG / ChromaDB
-# ============================================================
-
 @tool
 def get_flashcard_content(query: str):
     """
@@ -27,10 +23,6 @@ def get_flashcard_content(query: str):
 
     return documents
 
-
-# ============================================================
-# FLASHCARD AGENT
-# ============================================================
 
 class FlashcardAgent:
 
@@ -60,9 +52,6 @@ class FlashcardAgent:
             self.tools
         )
 
-    # ========================================================
-    # STEP 1: LLM decides which tool to use
-    # ========================================================
 
     def agent_node(self, state: dict) -> dict:
 
@@ -124,9 +113,7 @@ class FlashcardAgent:
             "messages": [response]
         }
 
-    # ========================================================
-    # STEP 2: Execute tool calls
-    # ========================================================
+
 
     def tool_node(self, state: dict) -> dict:
 
@@ -172,10 +159,6 @@ class FlashcardAgent:
             "messages": tool_outputs
         }
 
-    # ========================================================
-    # STEP 3: Generate final flashcards
-    # ========================================================
-
     def generate_final_flashcards(
         self,
         original_messages,
@@ -200,10 +183,6 @@ class FlashcardAgent:
         return final_response
 
 
-# ============================================================
-# TEST THE FLASHCARD AGENT
-# ============================================================
-
 if __name__ == "__main__":
 
     print("\n========================================")
@@ -224,9 +203,6 @@ if __name__ == "__main__":
         ]
     }
 
-    # --------------------------------------------------------
-    # STEP 1: Ask LLM to retrieve content
-    # --------------------------------------------------------
 
     response = agent.agent_node(
         state
@@ -235,9 +211,7 @@ if __name__ == "__main__":
     print("===== AGENT RESPONSE =====")
     print(response)
 
-    # --------------------------------------------------------
-    # STEP 2: Execute RAG tool
-    # --------------------------------------------------------
+   
 
     if response["messages"][0].tool_calls:
 
@@ -248,9 +222,6 @@ if __name__ == "__main__":
         print("\n===== TOOL RESPONSE =====")
         print(tool_response)
 
-        # ----------------------------------------------------
-        # STEP 3: Generate final flashcards
-        # ----------------------------------------------------
 
         final_response = agent.generate_final_flashcards(
             state["messages"],

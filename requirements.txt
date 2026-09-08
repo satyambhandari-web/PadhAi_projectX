@@ -76,3 +76,4 @@ faiss-cpu
 sqlalchemy
 passlib[bcrypt]
 python-jose
+gTTS

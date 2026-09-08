@@ -44,10 +44,6 @@ def get_quiz_content(query: str) -> str:
     return "\n\n".join(content)
 
 
-# ============================================================
-# QUIZ AGENT
-# ============================================================
-
 class QuizAgent:
 
     def __init__(self):
@@ -58,10 +54,6 @@ class QuizAgent:
             max_tokens=2048,
             api_key=os.getenv("GROQ_API_KEY"),
         )
-
-        # ----------------------------------------------------
-        # Tools
-        # ----------------------------------------------------
 
         self.tools = [
             get_quiz_content
@@ -76,10 +68,6 @@ class QuizAgent:
             self.tools
         )
 
-
-    # ========================================================
-    # AGENT NODE
-    # ========================================================
 
     def agent_node(self, state: dict) -> dict:
         """
@@ -122,10 +110,7 @@ IMPORTANT RULES:
         }
 
 
-    # ========================================================
-    # TOOL NODE
-    # ========================================================
-
+   
     def tool_node(self, state: dict) -> dict:
         """
         Execute the requested tool and return the result
@@ -139,19 +124,12 @@ IMPORTANT RULES:
 
         last_message = messages[-1]
 
-        # ----------------------------------------------------
-        # No tool call
-        # ----------------------------------------------------
-
         if not getattr(last_message, "tool_calls", None):
 
             return {
                 "messages": []
             }
 
-        # ----------------------------------------------------
-        # Execute the first tool call
-        # ----------------------------------------------------
 
         tool_call = last_message.tool_calls[0]
 
@@ -166,10 +144,7 @@ IMPORTANT RULES:
             tool_name
         )
 
-        # ----------------------------------------------------
-        # Tool not found
-        # ----------------------------------------------------
-
+        
         if tool_function is None:
 
             tool_message = ToolMessage(
@@ -184,10 +159,7 @@ IMPORTANT RULES:
                 ]
             }
 
-        # ----------------------------------------------------
-        # Execute tool
-        # ----------------------------------------------------
-
+     
         try:
 
             result = tool_function.invoke(
@@ -203,9 +175,7 @@ IMPORTANT RULES:
                 f"{str(error)}"
             )
 
-        # ----------------------------------------------------
-        # Convert result to ToolMessage
-        # ----------------------------------------------------
+
 
         tool_message = ToolMessage(
             content=result,
@@ -213,10 +183,7 @@ IMPORTANT RULES:
             name=tool_name,
         )
 
-        # ----------------------------------------------------
-        # IMPORTANT:
-        # Return state dictionary, NOT raw string
-        # ----------------------------------------------------
+       
 
         return {
             "messages": [
@@ -225,10 +192,6 @@ IMPORTANT RULES:
         }
 
 
-    # ========================================================
-    # FINAL QUIZ GENERATOR
-    # ========================================================
-
     def generate_final_quiz(
         self,
         topic: str,
@@ -236,9 +199,7 @@ IMPORTANT RULES:
         number_of_questions: int = 10,
     ) -> str:
 
-        # ----------------------------------------------------
-        # Validate question count
-        # ----------------------------------------------------
+       
 
         if number_of_questions < 1:
             number_of_questions = 1
@@ -246,9 +207,6 @@ IMPORTANT RULES:
         if number_of_questions > 20:
             number_of_questions = 20
 
-        # ----------------------------------------------------
-        # Limit retrieved context
-        # ----------------------------------------------------
 
         max_chars = 6500
 
@@ -258,9 +216,7 @@ IMPORTANT RULES:
                 retrieved_content[:max_chars]
             )
 
-        # ----------------------------------------------------
-        # Final generation prompt
-        # ----------------------------------------------------
+       
 
         system_prompt = SystemMessage(
             content=f"""
@@ -363,9 +319,7 @@ Generate the final quiz now.
 """
         )
 
-        # ----------------------------------------------------
-        # Generate final quiz
-        # ----------------------------------------------------
+    
 
         response = self.llm.invoke(
             [
@@ -377,9 +331,6 @@ Generate the final quiz now.
         return response.content
 
 
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -403,9 +354,6 @@ Create a quiz on {topic}.
         ]
     }
 
-    # ========================================================
-    # STEP 1 — AGENT
-    # ========================================================
 
     print("===== STEP 1: QUIZ AGENT =====")
     print()
@@ -415,10 +363,6 @@ Create a quiz on {topic}.
     )
 
     print("Agent response generated.")
-
-    # ========================================================
-    # STEP 2 — RETRIEVE CONTENT
-    # ========================================================
 
     if response["messages"]:
 
@@ -440,9 +384,6 @@ Create a quiz on {topic}.
                 }
             )
 
-            # ------------------------------------------------
-            # Extract ToolMessage content
-            # ------------------------------------------------
 
             if tool_result["messages"]:
 
@@ -466,9 +407,6 @@ Create a quiz on {topic}.
                     "WARNING: No educational content retrieved."
                 )
 
-            # =================================================
-            # STEP 3 — FINAL QUIZ
-            # =================================================
 
             print()
             print("=" * 60)

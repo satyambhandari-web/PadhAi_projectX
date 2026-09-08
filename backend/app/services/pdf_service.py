@@ -3,6 +3,7 @@ from langchain_community.document_loaders import PyPDFLoader
 
 
 def load_pdf(pdf_path: str):
+
     """
     Load a PDF and return its pages as LangChain Documents.
     """
@@ -16,9 +17,8 @@ def load_pdf(pdf_path: str):
         raise ValueError("Only PDF files are supported.")
 
     loader = PyPDFLoader(str(path))
-    documents = loader.load()
 
-    return documents
+    return loader.load()
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:

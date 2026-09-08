@@ -1,962 +1,2978 @@
-/* =========================================================
-   PadhAi — script.js
-   Vanilla JS. Organized as:
-   1. Config & API layer (FastAPI-ready, mocked for now)
-   2. Mock data
-   3. State
-   4. Utilities (toast, view routing, theme)
-   5. Feature modules (materials, summary, notes, quiz, flashcards, chat, settings)
-   6. Init
-   ========================================================= */
+/* ============================================================
+   PADHAI — FINAL CORRECTED FRONTEND
+   ============================================================
 
-/* =========================================================
-   1. CONFIG & API LAYER
-   ========================================================= */
+   BACKEND:
+   http://localhost:8000
+
+   MATERIALS:
+   GET  /api/materials
+   POST /api/upload
+
+   WORKFLOW:
+   POST /api/workflow
+
+   CHAT:
+   POST /api/chat
+
+   TTS:
+   POST /api/tts
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONFIG
+   ============================================================ */
+
 const API_BASE_URL = "http://localhost:8000";
-const USE_MOCK_API = true; // flip to false once the FastAPI backend is live
 
-/** Simulates network latency for demo/mock responses. */
-function mockDelay(min = 500, max = 1100) {
-  const ms = Math.floor(Math.random() * (max - min)) + min;
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
-/**
- * Thin wrapper around fetch() for the future FastAPI backend.
- * Every feature module below calls one of these functions instead of
- * touching fetch() directly, so swapping mock -> real API is a one-line change.
- */
-async function apiRequest(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
-  return res.json();
-}
+/* ============================================================
+   2. GLOBAL STATE
+   ============================================================ */
 
-/* ---- upload ---- */
-async function apiUploadMaterial(file, onProgress) {
-  if (USE_MOCK_API) {
-    for (let p = 0; p <= 100; p += 20) {
-      await mockDelay(90, 160);
-      onProgress?.(p);
-    }
-    return {
-      id: `mat_${Date.now()}`,
-      name: file.name,
-      pages: Math.floor(Math.random() * 40) + 8,
-      sizeKb: Math.round(file.size / 1024) || Math.floor(Math.random() * 900) + 200,
-      uploadedAt: new Date().toISOString(),
-      status: "ready",
-    };
-  }
-  // Real implementation (FastAPI, multipart/form-data):
-  // const formData = new FormData();
-  // formData.append("file", file);
-  // const res = await fetch(`${API_BASE_URL}/upload`, { method: "POST", body: formData });
-  // return res.json();
-}
-
-/* ---- summary ---- */
-async function apiGenerateSummary(materialId) {
-  if (USE_MOCK_API) {
-    await mockDelay(900, 1500);
-    return getMockSummary(materialId);
-  }
-  // return apiRequest(`/summary/${materialId}`, { method: "POST" });
-}
-
-/* ---- notes ---- */
-async function apiGenerateNotes(materialId) {
-  if (USE_MOCK_API) {
-    await mockDelay(900, 1500);
-    return getMockNotes(materialId);
-  }
-  // return apiRequest(`/notes/${materialId}`, { method: "POST" });
-}
-
-/* ---- quiz ---- */
-async function apiGenerateQuiz(materialId) {
-  if (USE_MOCK_API) {
-    await mockDelay(800, 1300);
-    return getMockQuiz(materialId);
-  }
-  // return apiRequest(`/quiz/${materialId}`, { method: "POST" });
-}
-
-/* ---- flashcards ---- */
-async function apiGenerateFlashcards(materialId) {
-  if (USE_MOCK_API) {
-    await mockDelay(800, 1300);
-    return getMockFlashcards(materialId);
-  }
-  // return apiRequest(`/flashcards/${materialId}`, { method: "POST" });
-}
-
-/* ---- chat ---- */
-async function apiSendChatMessage(message, history) {
-  if (USE_MOCK_API) {
-    await mockDelay(700, 1400);
-    return { reply: getMockChatReply(message) };
-  }
-  // return apiRequest("/chat", { method: "POST", body: JSON.stringify({ message, history }) });
-}
-
-/* =========================================================
-   2. MOCK DATA
-   ========================================================= */
 const state = {
   theme: "light",
   compactSidebar: false,
   currentView: "dashboard",
-  materials: [
-    { id: "mat_1", name: "Thermodynamics — Chapter 4.pdf", pages: 32, sizeKb: 1840, uploadedAt: daysAgo(1), status: "ready" },
-    { id: "mat_2", name: "Data Structures — Trees & Graphs.docx", pages: 18, sizeKb: 640, uploadedAt: daysAgo(2), status: "ready" },
-    { id: "mat_3", name: "Microeconomics Notes — Unit 3.pdf", pages: 24, sizeKb: 980, uploadedAt: daysAgo(4), status: "ready" },
-    { id: "mat_4", name: "Organic Chemistry — Reactions.pdf", pages: 41, sizeKb: 2210, uploadedAt: daysAgo(6), status: "ready" },
-  ],
-  quiz: { questions: [], index: 0, answers: [], materialName: "" },
-  flashcards: { cards: [], index: 0, materialName: "" },
+
+  materials: [],
+
+  selectedMaterial: null,
+
   chatHistory: [],
 };
 
-function daysAgo(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString();
-}
 
-function formatRelativeTime(iso) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  return `${days} days ago`;
-}
+/* ============================================================
+   3. API HELPER
+   ============================================================ */
 
-function getMaterialById(id) {
-  return state.materials.find((m) => m.id === id);
-}
+async function apiRequest(path, options = {}) {
 
-function getMockSummary(materialId) {
-  const material = getMaterialById(materialId);
-  const topic = topicFromName(material?.name);
-  return {
-    title: `Summary — ${material?.name || "Untitled material"}`,
-    readTime: `${Math.max(2, Math.round((material?.pages || 20) / 10))} min read`,
-    paragraphs: [
-      `This ${topic.subject} material walks through the core ideas of ${topic.focus}, starting from first principles before building up to the more applied problems typically seen in exams.`,
-      `The key thread running through the chapter is how ${topic.focus} connects to the broader syllabus — each section builds directly on the previous one, so it's worth working through in order rather than skipping ahead.`,
-      `A handful of worked examples anchor the theory to numbers you can actually check by hand, which is the fastest way to catch a shaky concept before it shows up on a test.`,
-    ],
-    keyPoints: topic.keyPoints,
+  const config = {
+    ...options,
+
+    headers: {
+      ...(options.body instanceof FormData
+        ? {}
+        : {
+          "Content-Type": "application/json",
+        }),
+
+      ...(options.headers || {}),
+    },
   };
+
+  let response;
+
+  try {
+
+    response = await fetch(
+      `${API_BASE_URL}${path}`,
+      config
+    );
+
+  } catch (error) {
+
+    throw new Error(
+      "Cannot connect to FastAPI backend. " +
+      "Make sure your backend is running on port 8000."
+    );
+  }
+
+
+  let data = null;
+
+  try {
+
+    data = await response.json();
+
+  } catch (_) {
+
+    data = null;
+  }
+
+
+  if (!response.ok) {
+
+    const message =
+      data?.detail ||
+      data?.message ||
+      `Request failed (${response.status})`;
+
+    throw new Error(message);
+  }
+
+
+  return data;
 }
 
-function getMockNotes(materialId) {
-  const material = getMaterialById(materialId);
-  const topic = topicFromName(material?.name);
-  return {
-    title: `Notes — ${material?.name || "Untitled material"}`,
-    sections: [
-      { heading: "Core definitions", items: topic.definitions },
-      { heading: "Key formulas & relationships", items: topic.formulas },
-      { heading: "Common exam traps", items: topic.traps },
-    ],
+
+/* ============================================================
+   4. MATERIALS
+   ============================================================ */
+
+async function apiListMaterials() {
+
+  /*
+     IMPORTANT:
+
+     Your backend returns:
+
+     [
+       {
+         "id": "Python_Complete_Notes.pdf",
+         "name": "Python_Complete_Notes.pdf",
+         "filename": "Python_Complete_Notes.pdf",
+         ...
+       }
+     ]
+  */
+
+  return apiRequest("/api/materials");
+}
+
+
+/* ============================================================
+   5. UPLOAD
+   ============================================================ */
+
+async function apiUploadMaterial(file, onProgress) {
+
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+
+  return new Promise((resolve, reject) => {
+
+    const xhr = new XMLHttpRequest();
+
+
+    xhr.open(
+      "POST",
+      `${API_BASE_URL}/api/upload`
+    );
+
+
+    xhr.upload.addEventListener(
+      "progress",
+      (event) => {
+
+        if (event.lengthComputable) {
+
+          const percentage =
+            Math.round(
+              (event.loaded / event.total) * 100
+            );
+
+          onProgress?.(percentage);
+        }
+      }
+    );
+
+
+    xhr.addEventListener(
+      "load",
+      () => {
+
+        let data = null;
+
+        try {
+
+          data =
+            JSON.parse(
+              xhr.responseText
+            );
+
+        } catch (_) {
+
+          data = null;
+        }
+
+
+        if (
+          xhr.status >= 200 &&
+          xhr.status < 300
+        ) {
+
+          onProgress?.(100);
+
+          resolve(data);
+
+        } else {
+
+          reject(
+            new Error(
+              data?.detail ||
+              `Upload failed (${xhr.status})`
+            )
+          );
+        }
+      }
+    );
+
+
+    xhr.addEventListener(
+      "error",
+      () => {
+
+        reject(
+          new Error(
+            "Network error during upload."
+          )
+        );
+      }
+    );
+
+
+    xhr.addEventListener(
+      "abort",
+      () => {
+
+        reject(
+          new Error(
+            "Upload was cancelled."
+          )
+        );
+      }
+    );
+
+
+    xhr.send(formData);
+  });
+}
+
+
+/* ============================================================
+   6. WORKFLOW API
+   ============================================================ */
+
+async function apiRunWorkflow(
+  task,
+  materialId,
+  customQuery = ""
+) {
+
+  if (!materialId) {
+
+    throw new Error(
+      "Please select a material first."
+    );
+  }
+
+
+  /*
+     materialId is actually the PDF filename.
+
+     Example:
+
+     Python_Complete_Notes.pdf
+
+     We explicitly include the material name
+     in the workflow query.
+  */
+
+  const material =
+    state.materials.find(
+      item =>
+        String(item.id) ===
+        String(materialId)
+    );
+
+
+  const filename =
+    material?.filename ||
+    material?.name ||
+    materialId;
+
+
+  let query;
+
+
+  if (customQuery && customQuery.trim()) {
+
+    query =
+      `${customQuery.trim()}\n\n` +
+      `Selected study material: ${filename}`;
+
+  } else {
+
+    const taskText = {
+
+      summary:
+        "Generate a clear and concise summary",
+
+      notes:
+        "Generate detailed exam-ready notes",
+
+      quiz:
+        "Generate a quiz with questions and answers",
+
+      flashcards:
+        "Generate useful study flashcards",
+
+      content:
+        "Generate educational learning content",
+
+    };
+
+
+    query =
+      `${taskText[task] || "Generate educational content"} ` +
+      `from the selected study material: ${filename}`;
+  }
+
+
+  return apiRequest(
+    "/api/workflow",
+    {
+      method: "POST",
+
+      body: JSON.stringify({
+
+        task: task,
+
+        query: query,
+      }),
+    }
+  );
+}
+
+
+/* ============================================================
+   7. SUMMARY
+   ============================================================ */
+
+async function apiGenerateSummary(
+  materialId,
+  query = ""
+) {
+
+  return apiRunWorkflow(
+    "summary",
+    materialId,
+    query
+  );
+}
+
+
+/* ============================================================
+   8. NOTES
+   ============================================================ */
+
+async function apiGenerateNotes(
+  materialId,
+  query = ""
+) {
+
+  return apiRunWorkflow(
+    "notes",
+    materialId,
+    query
+  );
+}
+
+
+/* ============================================================
+   9. QUIZ
+   ============================================================ */
+
+async function apiGenerateQuiz(
+  materialId,
+  query = ""
+) {
+
+  return apiRunWorkflow(
+    "quiz",
+    materialId,
+    query
+  );
+}
+
+
+/* ============================================================
+   10. FLASHCARDS
+   ============================================================ */
+
+async function apiGenerateFlashcards(
+  materialId,
+  query = ""
+) {
+
+  return apiRunWorkflow(
+    "flashcards",
+    materialId,
+    query
+  );
+}
+
+
+/* ============================================================
+   11. CONTENT
+   ============================================================ */
+
+async function apiGenerateContent(
+  materialId,
+  query = ""
+) {
+
+  return apiRunWorkflow(
+    "content",
+    materialId,
+    query
+  );
+}
+
+
+/* ============================================================
+   12. CHAT
+   ============================================================ */
+
+async function apiSendChatMessage(
+  message,
+  history,
+  materialId
+) {
+
+  const material =
+    state.materials.find(
+      item =>
+        String(item.id) ===
+        String(materialId)
+    );
+
+
+  const filename =
+    material?.filename ||
+    material?.name ||
+    materialId ||
+    null;
+
+
+  return apiRequest(
+    "/api/chat",
+    {
+      method: "POST",
+
+      body: JSON.stringify({
+
+        message: message,
+
+        filename: filename,
+      }),
+    }
+  );
+}
+
+
+/* ============================================================
+   13. ESCAPE HTML
+   ============================================================ */
+
+function escapeHtml(value = "") {
+
+  const div =
+    document.createElement("div");
+
+  div.textContent =
+    String(value);
+
+  return div.innerHTML;
+}
+
+
+/* ============================================================
+   14. MARKDOWN
+   ============================================================ */
+
+function renderMarkdown(markdown = "") {
+
+  const escaped =
+    escapeHtml(markdown);
+
+
+  const lines =
+    escaped.split(/\r?\n/);
+
+
+  let html = "";
+
+  let listOpen = false;
+
+
+  function closeList() {
+
+    if (listOpen) {
+
+      html += "</ul>";
+
+      listOpen = false;
+    }
+  }
+
+
+  function inlineFormat(text) {
+
+    return text
+
+      .replace(
+        /\*\*(.+?)\*\*/g,
+        "<strong>$1</strong>"
+      )
+
+      .replace(
+        /\*(.+?)\*/g,
+        "<em>$1</em>"
+      )
+
+      .replace(
+        /`(.+?)`/g,
+        "<code>$1</code>"
+      );
+  }
+
+
+  for (const rawLine of lines) {
+
+    const line =
+      rawLine.trim();
+
+
+    if (!line) {
+
+      closeList();
+
+      continue;
+    }
+
+
+    const heading =
+      line.match(
+        /^(#{1,6})\s+(.*)$/
+      );
+
+
+    const bullet =
+      line.match(
+        /^[-*]\s+(.*)$/
+      );
+
+
+    const numbered =
+      line.match(
+        /^\d+[.)]\s+(.*)$/
+      );
+
+
+    if (heading) {
+
+      closeList();
+
+
+      const level =
+        Math.min(
+          heading[1].length,
+          6
+        );
+
+
+      html +=
+        `<h${level}>` +
+        inlineFormat(
+          heading[2]
+        ) +
+        `</h${level}>`;
+
+      continue;
+    }
+
+
+    if (bullet || numbered) {
+
+      if (!listOpen) {
+
+        html += "<ul>";
+
+        listOpen = true;
+      }
+
+
+      const text =
+        bullet
+          ? bullet[1]
+          : numbered[1];
+
+
+      html +=
+        `<li>${inlineFormat(text)}</li>`;
+
+      continue;
+    }
+
+
+    if (line === "---") {
+
+      closeList();
+
+      html += "<hr>";
+
+      continue;
+    }
+
+
+    closeList();
+
+
+    html +=
+      `<p>${inlineFormat(line)}</p>`;
+  }
+
+
+  closeList();
+
+
+  return html;
+}
+
+
+/* ============================================================
+   15. TOAST
+   ============================================================ */
+
+function showToast(
+  type,
+  title,
+  message
+) {
+
+  const stack =
+    document.getElementById(
+      "toastStack"
+    );
+
+
+  if (!stack) return;
+
+
+  const icons = {
+
+    success: "✓",
+
+    error: "⚠",
+
+    info: "ℹ",
   };
-}
 
-function getMockQuiz(materialId) {
-  const material = getMaterialById(materialId);
-  const topic = topicFromName(material?.name);
-  return { materialName: material?.name || "Untitled material", questions: topic.quiz };
-}
 
-function getMockFlashcards(materialId) {
-  const material = getMaterialById(materialId);
-  const topic = topicFromName(material?.name);
-  return { materialName: material?.name || "Untitled material", cards: topic.flashcards };
-}
+  const toast =
+    document.createElement("div");
 
-function getMockChatReply(message) {
-  const lower = message.toLowerCase();
-  if (lower.includes("summar")) {
-    return "Head to the Summary tab and pick a material — I'll condense it into a short, readable brief with the key points pulled out.";
-  }
-  if (lower.includes("quiz") || lower.includes("test")) {
-    return "I can put together a quick MCQ quiz from any of your uploaded materials. Open the Quiz tab, choose a file, and I'll start you off with five questions.";
-  }
-  if (lower.includes("flashcard")) {
-    return "Flashcards work well for definitions and formulas. Try the Flashcards tab — I'll generate a deck you can flip through and shuffle.";
-  }
-  if (lower.includes("hello") || lower.includes("hi ")) {
-    return "Hey! I'm PadhAi — I can summarise your materials, build notes, quiz you, or just answer questions about what you've uploaded. What are we studying today?";
-  }
-  return "Good question. Once this is connected to your materials, I'll answer directly from what you've uploaded — for now, try asking me to summarise, quiz, or explain a topic and I'll point you to the right tool.";
-}
 
-/** Generates topic-flavoured mock content based on the material's file name. */
-function topicFromName(name = "") {
-  const lower = name.toLowerCase();
-  if (lower.includes("thermo")) {
-    return {
-      subject: "physics",
-      focus: "the laws of thermodynamics",
-      keyPoints: [
-        "The First Law is energy conservation applied to heat and work — ΔU = Q − W.",
-        "Entropy (the Second Law) explains why heat flows from hot to cold, never the reverse, without external work.",
-        "Reversible vs irreversible processes determine how much useful work a system can extract.",
-      ],
-      definitions: ["Internal energy (U): total kinetic + potential energy of a system's particles.", "Entropy (S): a measure of disorder or unavailable energy in a system.", "Adiabatic process: no heat exchange with the surroundings."],
-      formulas: ["ΔU = Q − W (First Law of Thermodynamics)", "η = 1 − (T_cold / T_hot) — Carnot efficiency", "ΔS ≥ 0 for an isolated system (Second Law)"],
-      traps: ["Mixing up sign conventions for work done on vs by the system.", "Forgetting that Carnot efficiency needs temperatures in Kelvin.", "Assuming all real processes are reversible — most aren't."],
-      quiz: [
-        { q: "Which law states that entropy of an isolated system never decreases?", options: ["Zeroth Law", "First Law", "Second Law", "Third Law"], answer: 2 },
-        { q: "In ΔU = Q − W, what does W represent?", options: ["Heat added to the system", "Work done by the system", "Total internal energy", "Weight of the system"], answer: 1 },
-        { q: "Carnot efficiency depends only on:", options: ["Pressure of the gas", "Volume of the container", "Temperatures of the two reservoirs", "Type of gas used"], answer: 2 },
-        { q: "An adiabatic process is one with:", options: ["No change in volume", "No heat exchange", "No work done", "Constant temperature"], answer: 1 },
-        { q: "As a system approaches absolute zero, its entropy approaches:", options: ["Infinity", "Zero", "A negative value", "The Carnot limit"], answer: 1 },
-      ],
-      flashcards: [
-        { front: "First Law of Thermodynamics", back: "Energy cannot be created or destroyed: ΔU = Q − W." },
-        { front: "Entropy", back: "A measure of disorder; increases in any isolated, irreversible process." },
-        { front: "Carnot efficiency formula", back: "η = 1 − (T_cold / T_hot), using absolute temperature." },
-        { front: "Adiabatic process", back: "A process with zero heat transfer to or from the system." },
-        { front: "Isothermal process", back: "A process that occurs at constant temperature." },
-        { front: "Second Law of Thermodynamics", back: "Entropy of an isolated system never decreases over time." },
-      ],
-    };
-  }
-  if (lower.includes("data structure") || lower.includes("tree") || lower.includes("graph")) {
-    return {
-      subject: "computer science",
-      focus: "trees and graph traversal",
-      keyPoints: [
-        "Binary search trees keep left < root < right, giving O(log n) lookup when balanced.",
-        "DFS uses a stack (or recursion); BFS uses a queue — the choice changes which paths you find first.",
-        "A graph with V vertices needs at most V−1 edges to form a spanning tree.",
-      ],
-      definitions: ["Binary Search Tree (BST): a tree where each node's left subtree holds smaller values, right holds larger.", "Adjacency list: a graph representation storing each vertex's neighbours in a list.", "Topological sort: a linear ordering of a DAG's vertices respecting edge direction."],
-      formulas: ["Height of a balanced BST: O(log n)", "DFS/BFS time complexity: O(V + E)", "Number of edges in a tree with V vertices: V − 1"],
-      traps: ["Forgetting a BST can degrade to O(n) if it becomes unbalanced (like a linked list).", "Mixing up when to use a stack (DFS) vs a queue (BFS).", "Not checking for cycles before running topological sort."],
-      quiz: [
-        { q: "What data structure does BFS traversal rely on?", options: ["Stack", "Queue", "Heap", "Hash map"], answer: 1 },
-        { q: "In a balanced BST, search time complexity is:", options: ["O(1)", "O(n)", "O(log n)", "O(n²)"], answer: 2 },
-        { q: "A tree with V vertices has how many edges?", options: ["V", "V + 1", "V − 1", "2V"], answer: 2 },
-        { q: "Which traversal is typically implemented with recursion or an explicit stack?", options: ["BFS", "DFS", "Dijkstra's", "Topological only"], answer: 1 },
-        { q: "Topological sort is only valid on:", options: ["Any graph", "Directed acyclic graphs", "Undirected graphs", "Binary trees only"], answer: 1 },
-      ],
-      flashcards: [
-        { front: "Binary Search Tree (BST)", back: "Left subtree < node < right subtree, enabling fast ordered search." },
-        { front: "DFS", back: "Depth-First Search — explores as far as possible before backtracking, uses a stack." },
-        { front: "BFS", back: "Breadth-First Search — explores neighbours level by level, uses a queue." },
-        { front: "Adjacency list", back: "Graph representation storing each vertex's neighbours in a list — space efficient for sparse graphs." },
-        { front: "Topological sort", back: "Orders DAG vertices so every edge points from earlier to later in the ordering." },
-        { front: "Balanced tree height", back: "O(log n) — keeps search, insert, and delete efficient." },
-      ],
-    };
-  }
-  if (lower.includes("econ")) {
-    return {
-      subject: "economics",
-      focus: "market structures and pricing",
-      keyPoints: [
-        "In perfect competition, firms are price takers and earn zero economic profit long-run.",
-        "A monopolist maximises profit where marginal revenue equals marginal cost, then prices off the demand curve.",
-        "Elasticity determines how much a price change shifts quantity demanded.",
-      ],
-      definitions: ["Marginal cost (MC): the cost of producing one additional unit.", "Price elasticity of demand: % change in quantity demanded ÷ % change in price.", "Consumer surplus: the gap between what buyers are willing to pay and what they actually pay."],
-      formulas: ["Profit-maximising rule: MR = MC", "Price elasticity: Ed = %ΔQd / %ΔP", "Total revenue: TR = P × Q"],
-      traps: ["Confusing a shift in demand with a movement along the demand curve.", "Assuming MR = P outside of perfect competition (it doesn't hold for a monopoly).", "Forgetting elasticity is usually negative for demand — compare magnitudes, not sign."],
-      quiz: [
-        { q: "A profit-maximising firm produces where:", options: ["Price = Average cost", "Marginal revenue = Marginal cost", "Total revenue is maximised", "Fixed cost = Variable cost"], answer: 1 },
-        { q: "In perfect competition, long-run economic profit is:", options: ["Always positive", "Always negative", "Zero", "Undefined"], answer: 2 },
-        { q: "If demand is elastic, a price increase will:", options: ["Increase total revenue", "Decrease total revenue", "Not affect revenue", "Double total revenue"], answer: 1 },
-        { q: "Consumer surplus is the area:", options: ["Below supply, above price", "Above demand, below price", "Below demand, above price", "Above supply, below price"], answer: 2 },
-        { q: "A monopolist's price is set:", options: ["Equal to marginal cost", "Off the demand curve at the profit-maximising quantity", "At the market equilibrium price", "Equal to average variable cost"], answer: 1 },
-      ],
-      flashcards: [
-        { front: "Marginal Revenue = Marginal Cost", back: "The profit-maximising output rule for any firm." },
-        { front: "Price elasticity of demand", back: "Ed = %ΔQd / %ΔP — measures responsiveness of demand to price." },
-        { front: "Perfect competition (long run)", back: "Firms are price takers; economic profit is driven to zero by entry/exit." },
-        { front: "Consumer surplus", back: "The value consumers gain from paying less than their maximum willingness to pay." },
-        { front: "Monopoly pricing", back: "Set where MR = MC, then priced off the demand curve — above marginal cost." },
-        { front: "Total revenue", back: "TR = Price × Quantity sold." },
-      ],
-    };
-  }
-  // default / organic chemistry / generic
-  return {
-    subject: "chemistry",
-    focus: "core reaction mechanisms",
-    keyPoints: [
-      "Nucleophilic substitution (SN1/SN2) depends heavily on the substrate's structure and the solvent used.",
-      "Reaction mechanisms are best learned by tracking electron movement with curved arrows, not by memorising outcomes.",
-      "Reaction rate and stereochemistry both hinge on whether a mechanism goes through a carbocation intermediate.",
-    ],
-    definitions: ["Nucleophile: an electron-rich species that donates a pair of electrons to form a bond.", "SN1 reaction: substitution proceeding via a carbocation intermediate, first-order kinetics.", "SN2 reaction: single-step substitution with backside attack, second-order kinetics."],
-    formulas: ["Rate (SN1) = k[substrate]", "Rate (SN2) = k[substrate][nucleophile]", "Markovnikov's rule: H adds to the carbon with more existing H atoms"],
-    traps: ["Assuming all substitution reactions follow the same mechanism.", "Forgetting solvent polarity favours SN1 (polar protic) vs SN2 (polar aprotic).", "Mixing up Markovnikov and anti-Markovnikov addition."],
-    quiz: [
-      { q: "SN2 reactions proceed via:", options: ["A carbocation intermediate", "A single concerted step with backside attack", "Free radical formation", "Two separate transition states"], answer: 1 },
-      { q: "SN1 reaction rate depends on:", options: ["Substrate concentration only", "Nucleophile concentration only", "Both substrate and nucleophile", "Neither — it's constant"], answer: 0 },
-      { q: "Polar protic solvents tend to favour:", options: ["SN2 reactions", "SN1 reactions", "No substitution", "Elimination only"], answer: 1 },
-      { q: "A nucleophile is best described as:", options: ["Electron-poor and seeking electrons", "Electron-rich, donates electron pairs", "Always negatively charged", "Always a halogen"], answer: 1 },
-      { q: "Markovnikov's rule predicts that H adds to:", options: ["The more substituted carbon", "The carbon with more existing hydrogens", "Either carbon randomly", "The carbon nearest a halogen"], answer: 1 },
-    ],
-    flashcards: [
-      { front: "SN1 reaction", back: "Substitution via a carbocation intermediate; rate depends only on substrate concentration." },
-      { front: "SN2 reaction", back: "Single-step substitution with backside attack; rate depends on both substrate and nucleophile." },
-      { front: "Nucleophile", back: "An electron-rich species that donates an electron pair to form a new bond." },
-      { front: "Markovnikov's rule", back: "In addition reactions, H bonds to the carbon that already has more hydrogens." },
-      { front: "Polar protic solvent", back: "Favours SN1 reactions by stabilising the carbocation intermediate." },
-      { front: "Leaving group", back: "The substituent that departs with the bonding electron pair during substitution." },
-    ],
-  };
-}
+  toast.className =
+    `toast ${type}`;
 
-/* =========================================================
-   4. UTILITIES
-   ========================================================= */
 
-/* ---- Toasts ---- */
-function showToast(type, title, message) {
-  const stack = document.getElementById("toastStack");
-  const icons = { success: "✓", error: "⚠", info: "ℹ" };
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
   toast.innerHTML = `
-    <span class="toast-icon">${icons[type] || icons.info}</span>
-    <div class="toast-body"><strong>${title}</strong><p>${message}</p></div>
-  `;
+
+        <span class="toast-icon">
+            ${icons[type] || "ℹ"}
+        </span>
+
+        <div class="toast-body">
+
+            <strong>
+                ${escapeHtml(title)}
+            </strong>
+
+            <p>
+                ${escapeHtml(message)}
+            </p>
+
+        </div>
+    `;
+
+
   stack.appendChild(toast);
-  setTimeout(() => {
-    toast.classList.add("is-leaving");
-    setTimeout(() => toast.remove(), 250);
-  }, 3800);
+
+
+  setTimeout(
+    () => {
+
+      toast.classList.add(
+        "is-leaving"
+      );
+
+
+      setTimeout(
+        () => toast.remove(),
+        250
+      );
+
+    },
+    3800
+  );
 }
 
-/* ---- View routing ---- */
+
+/* ============================================================
+   16. VIEW META
+   ============================================================ */
+
 const viewMeta = {
-  dashboard: { title: "Dashboard", subtitle: "Your learning, distilled by AI." },
-  materials: { title: "Materials", subtitle: "Upload and manage your study documents." },
-  summary: { title: "Summary", subtitle: "Turn any chapter into a clear, quick brief." },
-  notes: { title: "Notes", subtitle: "Structured, exam-ready notes on demand." },
-  quiz: { title: "Quiz", subtitle: "Test yourself with AI-generated MCQs." },
-  flashcards: { title: "Flashcards", subtitle: "Spaced-repetition ready study cards." },
-  chat: { title: "AI Chat", subtitle: "Ask PadhAi anything about your materials." },
-  settings: { title: "Settings", subtitle: "Manage your profile and preferences." },
+
+  dashboard: {
+    title: "Dashboard",
+    subtitle:
+      "Your learning, distilled by AI.",
+  },
+
+  materials: {
+    title: "Materials",
+    subtitle:
+      "Upload and manage your study documents.",
+  },
+
+  summary: {
+    title: "Summary",
+    subtitle:
+      "Turn any chapter into a clear, quick brief.",
+  },
+
+  notes: {
+    title: "Notes",
+    subtitle:
+      "Structured, exam-ready notes on demand.",
+  },
+
+  quiz: {
+    title: "Quiz",
+    subtitle:
+      "Test yourself with AI-generated questions.",
+  },
+
+  flashcards: {
+    title: "Flashcards",
+    subtitle:
+      "Study using AI-generated flashcards.",
+  },
+
+  chat: {
+    title: "AI Chat",
+    subtitle:
+      "Ask PadhAi about your materials.",
+  },
+
+  settings: {
+    title: "Settings",
+    subtitle:
+      "Manage your profile and preferences.",
+  },
 };
 
+
+/* ============================================================
+   17. VIEW NAVIGATION
+   ============================================================ */
+
 function goToView(view) {
-  state.currentView = view;
-  document.querySelectorAll(".view").forEach((el) => el.classList.remove("is-active"));
-  document.getElementById(`view-${view}`)?.classList.add("is-active");
-  document.querySelectorAll(".nav-item").forEach((btn) => {
-    btn.classList.toggle("is-active", btn.dataset.view === view);
-  });
-  const meta = viewMeta[view];
+
+  state.currentView =
+    view;
+
+
+  document
+    .querySelectorAll(".view")
+    .forEach(
+      element =>
+        element.classList.remove(
+          "is-active"
+        )
+    );
+
+
+  document
+    .getElementById(
+      `view-${view}`
+    )
+    ?.classList.add(
+      "is-active"
+    );
+
+
+  document
+    .querySelectorAll(".nav-item")
+    .forEach(
+      button => {
+
+        button.classList.toggle(
+          "is-active",
+          button.dataset.view === view
+        );
+      }
+    );
+
+
+  const meta =
+    viewMeta[view];
+
+
   if (meta) {
-    document.getElementById("viewTitle").textContent = meta.title;
-    document.getElementById("viewSubtitle").textContent = meta.subtitle;
+
+    const title =
+      document.getElementById(
+        "viewTitle"
+      );
+
+
+    const subtitle =
+      document.getElementById(
+        "viewSubtitle"
+      );
+
+
+    if (title)
+      title.textContent =
+        meta.title;
+
+
+    if (subtitle)
+      subtitle.textContent =
+        meta.subtitle;
   }
-  document.body.classList.remove("sidebar-open");
-  document.getElementById("content").scrollTo({ top: 0, behavior: "smooth" });
+
+
+  document.body.classList.remove(
+    "sidebar-open"
+  );
 }
 
-/* ---- Theme ---- */
+
+/* ============================================================
+   18. THEME
+   ============================================================ */
+
 function applyTheme(theme) {
-  state.theme = theme;
-  document.body.setAttribute("data-theme", theme);
-  document.getElementById("settingsThemeSwitch")?.classList.toggle("is-on", theme === "dark");
-  document.getElementById("settingsThemeSwitch")?.setAttribute("aria-checked", theme === "dark");
-  localStorage.setItem("padhai-theme", theme);
+
+  state.theme =
+    theme;
+
+
+  document.body.setAttribute(
+    "data-theme",
+    theme
+  );
+
+
+  const switchElement =
+    document.getElementById(
+      "settingsThemeSwitch"
+    );
+
+
+  switchElement?.classList.toggle(
+    "is-on",
+    theme === "dark"
+  );
+
+
+  switchElement?.setAttribute(
+    "aria-checked",
+    String(theme === "dark")
+  );
+
+
+  localStorage.setItem(
+    "padhai-theme",
+    theme
+  );
 }
+
 
 function toggleTheme() {
-  applyTheme(state.theme === "light" ? "dark" : "light");
+
+  applyTheme(
+    state.theme === "light"
+      ? "dark"
+      : "light"
+  );
 }
 
-/* ---- Select population ---- */
+
+/* ============================================================
+   19. MATERIAL SELECTS
+   ============================================================ */
+
 function populateMaterialSelects() {
-  const selects = [
-    document.getElementById("summaryMaterialSelect"),
-    document.getElementById("notesMaterialSelect"),
-    document.getElementById("quizMaterialSelect"),
-    document.getElementById("flashMaterialSelect"),
+
+  const selectIds = [
+
+    "summaryMaterialSelect",
+
+    "notesMaterialSelect",
+
+    "quizMaterialSelect",
+
+    "flashMaterialSelect",
   ];
-  const options = state.materials
-    .map((m) => `<option value="${m.id}">${m.name}</option>`)
-    .join("");
-  selects.forEach((sel) => {
-    if (!sel) return;
-    sel.innerHTML = state.materials.length
-      ? options
-      : `<option value="">No materials uploaded yet</option>`;
+
+
+  selectIds.forEach(id => {
+
+    const select =
+      document.getElementById(id);
+
+
+    if (!select) return;
+
+
+    if (!state.materials.length) {
+
+      select.innerHTML =
+        `<option value="">
+                    No materials uploaded yet
+                </option>`;
+
+      return;
+    }
+
+
+    select.innerHTML = `
+
+            <option value="">
+                Select a material
+            </option>
+
+            ${state.materials
+        .map(material => {
+
+          const id =
+            material.id ||
+            material.filename ||
+            material.name;
+
+          const name =
+            material.name ||
+            material.filename ||
+            material.id;
+
+
+          return `
+                        <option value="${escapeHtml(id)}">
+                            ${escapeHtml(name)}
+                        </option>
+                    `;
+        })
+        .join("")}
+        `;
+
+
+    select.addEventListener(
+      "change",
+      () => {
+
+        if (select.value) {
+
+          state.selectedMaterial =
+            select.value;
+        }
+      }
+    );
   });
 }
 
-/* =========================================================
-   5. FEATURE MODULES
-   ========================================================= */
 
-/* ---- Dashboard ---- */
-function renderStats() {
-  const grid = document.getElementById("statsGrid");
-  const stats = [
-    { icon: "▥", label: "Materials uploaded", value: state.materials.length, trend: "+2 this week" },
-    { icon: "≣", label: "Summaries generated", value: 18, trend: "+5 this week" },
-    { icon: "◈", label: "Quizzes taken", value: 11, trend: "82% avg score" },
-    { icon: "▭", label: "Flashcards reviewed", value: 146, trend: "+34 this week" },
-  ];
-  grid.innerHTML = stats
-    .map(
-      (s) => `
-    <div class="stat-card">
-      <div class="stat-top">
-        <span class="stat-icon">${s.icon}</span>
-        <span class="stat-trend up">${s.trend}</span>
-      </div>
-      <div class="stat-value">${s.value}</div>
-      <div class="stat-label">${s.label}</div>
-    </div>`
-    )
-    .join("");
+/* ============================================================
+   20. REFRESH MATERIALS
+   ============================================================ */
+
+async function refreshMaterials() {
+
+  try {
+
+    const materials =
+      await apiListMaterials();
+
+
+    state.materials =
+      Array.isArray(materials)
+        ? materials
+        : [];
+
+
+    populateMaterialSelects();
+
+    renderStats();
+
+    renderRecentMaterials();
+
+    renderMaterials();
+
+
+  } catch (error) {
+
+    console.error(
+      "[MATERIAL ERROR]",
+      error
+    );
+
+
+    state.materials = [];
+
+
+    populateMaterialSelects();
+
+    renderStats();
+
+    renderRecentMaterials();
+
+    renderMaterials();
+
+
+    showToast(
+      "error",
+      "Could not load materials",
+      error.message
+    );
+  }
 }
+
+
+/* ============================================================
+   21. STATS
+   ============================================================ */
+
+function renderStats() {
+
+  const grid =
+    document.getElementById(
+      "statsGrid"
+    );
+
+
+  if (!grid) return;
+
+
+  const stats = [
+
+    {
+      icon: "▥",
+      label: "Materials uploaded",
+      value: state.materials.length,
+      trend: "From your library",
+    },
+
+    {
+      icon: "≣",
+      label: "Study materials ready",
+      value: state.materials.length,
+      trend: "Available now",
+    },
+
+    {
+      icon: "◈",
+      label: "AI tools available",
+      value: "5",
+      trend: "Summary · Notes · Quiz",
+    },
+
+    {
+      icon: "▭",
+      label: "Learning mode",
+      value: "AI",
+      trend: "Powered by your workflow",
+    },
+  ];
+
+
+  grid.innerHTML =
+    stats
+      .map(item => `
+
+                <div class="stat-card">
+
+                    <div class="stat-top">
+
+                        <span class="stat-icon">
+                            ${item.icon}
+                        </span>
+
+                        <span class="stat-trend">
+                            ${escapeHtml(item.trend)}
+                        </span>
+
+                    </div>
+
+                    <div class="stat-value">
+                        ${escapeHtml(String(item.value))}
+                    </div>
+
+                    <div class="stat-label">
+                        ${escapeHtml(item.label)}
+                    </div>
+
+                </div>
+
+            `)
+      .join("");
+}
+
+
+/* ============================================================
+   22. RECENT MATERIALS
+   ============================================================ */
 
 function renderRecentMaterials() {
-  const list = document.getElementById("recentList");
+
+  const list =
+    document.getElementById(
+      "recentList"
+    );
+
+
+  if (!list) return;
+
+
   if (!state.materials.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">▥</div><h4>Nothing here yet</h4><p>Upload a material to see it appear in your recent list.</p></div>`;
+
+    list.innerHTML = `
+
+            <div class="empty-state">
+
+                <div class="empty-icon">
+                    ▥
+                </div>
+
+                <h4>
+                    No materials yet
+                </h4>
+
+                <p>
+                    Upload a PDF to get started.
+                </p>
+
+            </div>
+        `;
+
     return;
   }
-  list.innerHTML = state.materials
-    .slice(0, 4)
-    .map(
-      (m) => `
-    <div class="recent-item">
-      <span class="recent-icon">${fileExt(m.name)}</span>
-      <div class="recent-meta">
-        <strong>${m.name}</strong>
-        <small>${formatRelativeTime(m.uploadedAt)} · ${m.pages} pages</small>
-      </div>
-      <span class="recent-status ready">Ready</span>
-    </div>`
-    )
-    .join("");
+
+
+  list.innerHTML =
+    state.materials
+      .slice(0, 5)
+      .map(material => `
+
+                <div class="recent-item">
+
+                    <span class="recent-icon">
+                        PDF
+                    </span>
+
+                    <div class="recent-meta">
+
+                        <strong>
+                            ${escapeHtml(
+        material.name ||
+        material.filename ||
+        material.id
+      )}
+                        </strong>
+
+                        <small>
+                            ${material.pages || 0}
+                            pages
+                            ·
+                            ${formatRelativeTime(
+        material.uploadedAt
+      )}
+                        </small>
+
+                    </div>
+
+                    <span class="recent-status ready">
+                        Ready
+                    </span>
+
+                </div>
+
+            `)
+      .join("");
 }
 
-function fileExt(name) {
-  const ext = name.split(".").pop().toUpperCase();
-  return ext.length <= 4 ? ext : "DOC";
-}
 
-/* ---- Materials / Upload ---- */
+/* ============================================================
+   23. MATERIALS PAGE
+   ============================================================ */
+
 function renderMaterials() {
-  const grid = document.getElementById("materialsGrid");
-  const empty = document.getElementById("materialsEmpty");
-  const count = document.getElementById("materialsCount");
-  count.textContent = `${state.materials.length} file${state.materials.length === 1 ? "" : "s"}`;
+
+  const grid =
+    document.getElementById(
+      "materialsGrid"
+    );
+
+
+  const empty =
+    document.getElementById(
+      "materialsEmpty"
+    );
+
+
+  const count =
+    document.getElementById(
+      "materialsCount"
+    );
+
+
+  if (!grid) return;
+
+
+  if (count) {
+
+    count.textContent =
+      `${state.materials.length} file${state.materials.length === 1
+        ? ""
+        : "s"
+      }`;
+  }
+
 
   if (!state.materials.length) {
+
     grid.innerHTML = "";
-    empty.hidden = false;
+
+    if (empty)
+      empty.hidden = false;
+
     return;
   }
-  empty.hidden = true;
-  grid.innerHTML = state.materials
-    .map(
-      (m) => `
-    <div class="material-card">
-      <div class="material-top">
-        <span class="material-icon">${fileExt(m.name)}</span>
-        <span class="recent-status ready">Ready</span>
-      </div>
-      <h4>${m.name}</h4>
-      <p>${m.pages} pages · ${(m.sizeKb / 1024).toFixed(1)} MB · ${formatRelativeTime(m.uploadedAt)}</p>
-      <div class="material-actions">
-        <button class="pill-btn" data-action="summary" data-id="${m.id}">Summarise</button>
-        <button class="pill-btn" data-action="quiz" data-id="${m.id}">Quiz me</button>
-        <button class="pill-btn" data-action="flashcards" data-id="${m.id}">Flashcards</button>
-      </div>
-    </div>`
-    )
-    .join("");
 
-  grid.querySelectorAll(".pill-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const { action, id } = btn.dataset;
-      goToView(action);
-      const selectId = { summary: "summaryMaterialSelect", quiz: "quizMaterialSelect", flashcards: "flashMaterialSelect" }[action];
-      const sel = document.getElementById(selectId);
-      if (sel) sel.value = id;
+
+  if (empty)
+    empty.hidden = true;
+
+
+  grid.innerHTML =
+    state.materials
+      .map(material => {
+
+        const id =
+          material.id ||
+          material.filename ||
+          material.name;
+
+        const name =
+          material.name ||
+          material.filename ||
+          material.id;
+
+
+        const sizeMb =
+          material.sizeKb
+            ? (
+              material.sizeKb / 1024
+            ).toFixed(1)
+            : (
+              (material.size || 0) /
+              (1024 * 1024)
+            ).toFixed(1);
+
+
+        return `
+
+                    <div class="material-card">
+
+                        <div class="material-top">
+
+                            <span class="material-icon">
+                                PDF
+                            </span>
+
+                            <span class="recent-status ready">
+                                Ready
+                            </span>
+
+                        </div>
+
+                        <h4>
+                            ${escapeHtml(name)}
+                        </h4>
+
+                        <p>
+                            ${material.pages || 0}
+                            pages
+                            ·
+                            ${sizeMb}
+                            MB
+                            ·
+                            ${formatRelativeTime(
+          material.uploadedAt
+        )}
+                        </p>
+
+                        <div class="material-actions">
+
+                            <button
+                                class="pill-btn"
+                                data-action="summary"
+                                data-id="${escapeHtml(id)}"
+                            >
+                                Summarise
+                            </button>
+
+                            <button
+                                class="pill-btn"
+                                data-action="quiz"
+                                data-id="${escapeHtml(id)}"
+                            >
+                                Quiz me
+                            </button>
+
+                            <button
+                                class="pill-btn"
+                                data-action="flashcards"
+                                data-id="${escapeHtml(id)}"
+                            >
+                                Flashcards
+                            </button>
+
+                        </div>
+
+                    </div>
+                `;
+      })
+      .join("");
+
+
+  grid
+    .querySelectorAll(".pill-btn")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const action =
+            button.dataset.action;
+
+
+          const id =
+            button.dataset.id;
+
+
+          selectMaterialEverywhere(id);
+
+
+          const selectMap = {
+
+            summary:
+              "summaryMaterialSelect",
+
+            quiz:
+              "quizMaterialSelect",
+
+            flashcards:
+              "flashMaterialSelect",
+          };
+
+
+          const select =
+            document.getElementById(
+              selectMap[action]
+            );
+
+
+          if (select)
+            select.value = id;
+
+
+          goToView(action);
+        }
+      );
     });
-  });
 }
+
+
+/* ============================================================
+   24. UPLOAD
+   ============================================================ */
 
 function initUpload() {
-  const dropzone = document.getElementById("dropzone");
-  const fileInput = document.getElementById("fileInput");
-  const browseBtn = document.getElementById("browseBtn");
-  const progressWrap = document.getElementById("uploadProgress");
-  const progressFill = document.getElementById("uploadProgressFill");
-  const progressLabel = document.getElementById("uploadProgressLabel");
 
-  browseBtn.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
+  const dropzone =
+    document.getElementById(
+      "dropzone"
+    );
 
-  ["dragenter", "dragover"].forEach((evt) =>
-    dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropzone.classList.add("is-dragover");
-    })
+
+  const fileInput =
+    document.getElementById(
+      "fileInput"
+    );
+
+
+  const browseBtn =
+    document.getElementById(
+      "browseBtn"
+    );
+
+
+  const progressWrap =
+    document.getElementById(
+      "uploadProgress"
+    );
+
+
+  const progressFill =
+    document.getElementById(
+      "uploadProgressFill"
+    );
+
+
+  const progressLabel =
+    document.getElementById(
+      "uploadProgressLabel"
+    );
+
+
+  if (!dropzone || !fileInput)
+    return;
+
+
+  browseBtn?.addEventListener(
+    "click",
+    () => fileInput.click()
   );
-  ["dragleave", "drop"].forEach((evt) =>
-    dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropzone.classList.remove("is-dragover");
-    })
+
+
+  fileInput.addEventListener(
+    "change",
+    event => {
+
+      handleFiles(
+        event.target.files
+      );
+    }
   );
-  dropzone.addEventListener("drop", (e) => handleFiles(e.dataTransfer.files));
+
+
+  [
+    "dragenter",
+    "dragover",
+  ].forEach(eventName => {
+
+    dropzone.addEventListener(
+      eventName,
+      event => {
+
+        event.preventDefault();
+
+        dropzone.classList.add(
+          "is-dragover"
+        );
+      }
+    );
+  });
+
+
+  [
+    "dragleave",
+    "drop",
+  ].forEach(eventName => {
+
+    dropzone.addEventListener(
+      eventName,
+      event => {
+
+        event.preventDefault();
+
+        dropzone.classList.remove(
+          "is-dragover"
+        );
+      }
+    );
+  });
+
+
+  dropzone.addEventListener(
+    "drop",
+    event => {
+
+      handleFiles(
+        event.dataTransfer.files
+      );
+    }
+  );
+
 
   async function handleFiles(fileList) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
+
+    const files =
+      Array.from(
+        fileList || []
+      );
+
+
+    if (!files.length)
+      return;
+
 
     for (const file of files) {
-      progressWrap.hidden = false;
-      progressLabel.textContent = `Uploading ${file.name}…`;
-      progressFill.style.width = "0%";
+
+      if (
+        !file.name
+          .toLowerCase()
+          .endsWith(".pdf")
+      ) {
+
+        showToast(
+          "error",
+          "Invalid file",
+          `${file.name} is not a PDF.`
+        );
+
+        continue;
+      }
+
+
+      if (progressWrap)
+        progressWrap.hidden = false;
+
+
+      if (progressLabel)
+        progressLabel.textContent =
+          `Uploading ${file.name}...`;
+
+
+      if (progressFill)
+        progressFill.style.width =
+          "0%";
+
+
       try {
-        const material = await apiUploadMaterial(file, (pct) => {
-          progressFill.style.width = `${pct}%`;
-        });
-        state.materials.unshift(material);
-        renderMaterials();
-        renderRecentMaterials();
-        renderStats();
-        populateMaterialSelects();
-        showToast("success", "Upload complete", `${file.name} is ready to use.`);
-      } catch (err) {
-        showToast("error", "Upload failed", "Something went wrong — please try again.");
+
+        const result =
+          await apiUploadMaterial(
+            file,
+            percentage => {
+
+              if (progressFill)
+                progressFill.style.width =
+                  `${percentage}%`;
+            }
+          );
+
+
+        showToast(
+          "success",
+          "Upload complete",
+          `${file.name} is ready.`
+        );
+
+
+        await refreshMaterials();
+
+
+        /*
+           IMPORTANT:
+
+           Backend upload may return:
+
+           {
+               filename: "...",
+               name: "...",
+               id: "..."
+           }
+
+           We use whichever exists.
+        */
+
+        const newId =
+          result?.id ||
+          result?.filename ||
+          result?.name ||
+          file.name;
+
+
+        selectMaterialEverywhere(
+          newId
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "[UPLOAD ERROR]",
+          error
+        );
+
+
+        showToast(
+          "error",
+          "Upload failed",
+          error.message
+        );
       }
     }
-    progressWrap.hidden = true;
+
+
+    if (progressWrap)
+      progressWrap.hidden = true;
+
+
     fileInput.value = "";
   }
 }
 
-/* ---- Summary ---- */
+
+/* ============================================================
+   25. SELECT MATERIAL EVERYWHERE
+   ============================================================ */
+
+function selectMaterialEverywhere(materialId) {
+
+  if (!materialId)
+    return;
+
+
+  state.selectedMaterial =
+    materialId;
+
+
+  [
+    "summaryMaterialSelect",
+    "notesMaterialSelect",
+    "quizMaterialSelect",
+    "flashMaterialSelect",
+  ].forEach(id => {
+
+    const select =
+      document.getElementById(id);
+
+
+    if (select)
+      select.value =
+        materialId;
+  });
+}
+
+
+/* ============================================================
+   26. SUMMARY
+   ============================================================ */
+
 function initSummary() {
-  const btn = document.getElementById("summaryGenerateBtn");
-  const output = document.getElementById("summaryOutput");
-  const select = document.getElementById("summaryMaterialSelect");
 
-  btn.addEventListener("click", async () => {
-    if (!select.value) {
-      showToast("error", "Pick a material", "Upload or select a file before generating a summary.");
-      return;
+  const button =
+    document.getElementById(
+      "summaryGenerateBtn"
+    );
+
+
+  const select =
+    document.getElementById(
+      "summaryMaterialSelect"
+    );
+
+
+  const output =
+    document.getElementById(
+      "summaryOutput"
+    );
+
+
+  if (!button || !select || !output)
+    return;
+
+
+  button.addEventListener(
+    "click",
+    async () => {
+
+      const materialId =
+        select.value;
+
+
+      if (!materialId) {
+
+        showToast(
+          "error",
+          "Select a material",
+          "Choose a PDF first."
+        );
+
+        return;
+      }
+
+
+      state.selectedMaterial =
+        materialId;
+
+
+      button.disabled = true;
+
+      button.textContent =
+        "Generating...";
+
+
+      output.innerHTML =
+        renderSkeleton(5);
+
+
+      try {
+
+        const data =
+          await apiGenerateSummary(
+            materialId
+          );
+
+
+        const content =
+          data.output ||
+          data.content ||
+          data.response ||
+          "No summary returned.";
+
+
+        output.innerHTML = `
+
+                    <div class="output-card">
+
+                        <h4>
+                            ${escapeHtml(
+          data.title ||
+          "Summary"
+        )}
+                        </h4>
+
+                        <div style="margin-top:1rem;">
+                            ${renderMarkdown(content)}
+                        </div>
+
+                        <div class="output-foot">
+
+                            <button
+                                class="btn btn-ghost"
+                                id="copySummaryBtn"
+                            >
+                                Copy text
+                            </button>
+
+                            <button
+                                class="btn btn-ghost"
+                                id="regenSummaryBtn"
+                            >
+                                Regenerate
+                            </button>
+
+                        </div>
+
+                    </div>
+                `;
+
+
+        document
+          .getElementById(
+            "copySummaryBtn"
+          )
+          ?.addEventListener(
+            "click",
+            () =>
+              copyToClipboard(
+                content,
+                "Summary"
+              )
+          );
+
+
+        document
+          .getElementById(
+            "regenSummaryBtn"
+          )
+          ?.addEventListener(
+            "click",
+            () => button.click()
+          );
+
+
+        showToast(
+          "success",
+          "Summary ready",
+          "Your workflow generated the summary."
+        );
+
+
+      } catch (error) {
+
+        output.innerHTML =
+          renderErrorState(
+            error.message
+          );
+
+
+        showToast(
+          "error",
+          "Summary failed",
+          error.message
+        );
+
+
+      } finally {
+
+        button.disabled = false;
+
+        button.textContent =
+          "Generate summary";
+      }
     }
-    btn.disabled = true;
-    btn.textContent = "Generating…";
-    output.innerHTML = renderSkeleton(4);
-    try {
-      const data = await apiGenerateSummary(select.value);
-      output.innerHTML = `
-        <div class="output-card">
-          <h4>${data.title}</h4>
-          <span class="chip">${data.readTime}</span>
-          <div style="margin-top:1rem;">
-            ${data.paragraphs.map((p) => `<p>${p}</p>`).join("")}
-          </div>
-          <div class="note-block">
-            <h5>Key points</h5>
-            <ul>${data.keyPoints.map((k) => `<li>${k}</li>`).join("")}</ul>
-          </div>
-          <div class="output-foot">
-            <button class="btn btn-ghost" id="copySummaryBtn">Copy text</button>
-            <button class="btn btn-ghost" id="regenSummaryBtn">Regenerate</button>
-          </div>
-        </div>`;
-      document.getElementById("regenSummaryBtn").addEventListener("click", () => btn.click());
-      document.getElementById("copySummaryBtn").addEventListener("click", () =>
-        copyToClipboard(data.paragraphs.join("\n\n"), "Summary")
-      );
-      showToast("success", "Summary ready", "Your AI summary has been generated.");
-    } catch (err) {
-      output.innerHTML = renderErrorState("We couldn't generate this summary. Please try again.");
-      showToast("error", "Generation failed", "Please try again in a moment.");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Generate summary";
-    }
-  });
+  );
 }
 
-/* ---- Notes ---- */
+
+/* ============================================================
+   27. NOTES
+   ============================================================ */
+
 function initNotes() {
-  const btn = document.getElementById("notesGenerateBtn");
-  const output = document.getElementById("notesOutput");
-  const select = document.getElementById("notesMaterialSelect");
 
-  btn.addEventListener("click", async () => {
-    if (!select.value) {
-      showToast("error", "Pick a material", "Upload or select a file before generating notes.");
-      return;
+  const button =
+    document.getElementById(
+      "notesGenerateBtn"
+    );
+
+
+  const select =
+    document.getElementById(
+      "notesMaterialSelect"
+    );
+
+
+  const output =
+    document.getElementById(
+      "notesOutput"
+    );
+
+
+  if (!button || !select || !output)
+    return;
+
+
+  button.addEventListener(
+    "click",
+    async () => {
+
+      const materialId =
+        select.value;
+
+
+      if (!materialId) {
+
+        showToast(
+          "error",
+          "Select a material",
+          "Choose a PDF first."
+        );
+
+        return;
+      }
+
+
+      state.selectedMaterial =
+        materialId;
+
+
+      button.disabled = true;
+
+      button.textContent =
+        "Generating...";
+
+
+      output.innerHTML =
+        renderSkeleton(5);
+
+
+      try {
+
+        const data =
+          await apiGenerateNotes(
+            materialId
+          );
+
+
+        const content =
+          data.output ||
+          data.content ||
+          data.response ||
+          "No notes returned.";
+
+
+        output.innerHTML = `
+
+                    <div class="output-card">
+
+                        <h4>
+                            ${escapeHtml(
+          data.title ||
+          "Notes"
+        )}
+                        </h4>
+
+                        <div
+                            class="note-block"
+                        >
+                            ${renderMarkdown(content)}
+                        </div>
+
+                        <div class="output-foot">
+
+                            <button
+                                class="btn btn-ghost"
+                                id="copyNotesBtn"
+                            >
+                                Copy text
+                            </button>
+
+                            <button
+                                class="btn btn-ghost"
+                                id="regenNotesBtn"
+                            >
+                                Regenerate
+                            </button>
+
+                        </div>
+
+                    </div>
+                `;
+
+
+        document
+          .getElementById(
+            "copyNotesBtn"
+          )
+          ?.addEventListener(
+            "click",
+            () =>
+              copyToClipboard(
+                content,
+                "Notes"
+              )
+          );
+
+
+        document
+          .getElementById(
+            "regenNotesBtn"
+          )
+          ?.addEventListener(
+            "click",
+            () => button.click()
+          );
+
+
+        showToast(
+          "success",
+          "Notes ready",
+          "Your workflow generated the notes."
+        );
+
+
+      } catch (error) {
+
+        output.innerHTML =
+          renderErrorState(
+            error.message
+          );
+
+
+        showToast(
+          "error",
+          "Notes failed",
+          error.message
+        );
+
+
+      } finally {
+
+        button.disabled = false;
+
+        button.textContent =
+          "Generate notes";
+      }
     }
-    btn.disabled = true;
-    btn.textContent = "Generating…";
-    output.innerHTML = renderSkeleton(5);
-    try {
-      const data = await apiGenerateNotes(select.value);
-      output.innerHTML = `
-        <div class="output-card">
-          <h4>${data.title}</h4>
-          ${data.sections
-            .map(
-              (s) => `
-            <div class="note-block">
-              <h5>${s.heading}</h5>
-              <ul>${s.items.map((i) => `<li>${i}</li>`).join("")}</ul>
-            </div>`
-            )
-            .join("")}
-          <div class="output-foot">
-            <button class="btn btn-ghost" id="copyNotesBtn">Copy text</button>
-            <button class="btn btn-ghost" id="regenNotesBtn">Regenerate</button>
-          </div>
-        </div>`;
-      document.getElementById("regenNotesBtn").addEventListener("click", () => btn.click());
-      document.getElementById("copyNotesBtn").addEventListener("click", () =>
-        copyToClipboard(data.sections.map((s) => `${s.heading}\n${s.items.join("\n")}`).join("\n\n"), "Notes")
-      );
-      showToast("success", "Notes ready", "Your structured notes have been generated.");
-    } catch (err) {
-      output.innerHTML = renderErrorState("We couldn't generate these notes. Please try again.");
-      showToast("error", "Generation failed", "Please try again in a moment.");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Generate notes";
-    }
-  });
+  );
 }
 
-/* ---- Quiz ---- */
+
+/* ============================================================
+   28. QUIZ
+   ============================================================ */
+
 function initQuiz() {
-  const setup = document.getElementById("quizSetup");
-  const select = document.getElementById("quizMaterialSelect");
-  const generateBtn = document.getElementById("quizGenerateBtn");
-  const quizBox = document.getElementById("quizBox");
-  const resultBox = document.getElementById("quizResult");
-  const questionEl = document.getElementById("quizQuestion");
-  const optionsEl = document.getElementById("quizOptions");
-  const progressLabel = document.getElementById("quizProgressLabel");
-  const progressFill = document.getElementById("quizProgressFill");
-  const prevBtn = document.getElementById("quizPrevBtn");
-  const nextBtn = document.getElementById("quizNextBtn");
-  const retakeBtn = document.getElementById("quizRetakeBtn");
 
-  generateBtn.addEventListener("click", async () => {
-    if (!select.value) {
-      showToast("error", "Pick a material", "Choose a file to generate a quiz from.");
-      return;
+  const setup =
+    document.getElementById(
+      "quizSetup"
+    );
+
+
+  const select =
+    document.getElementById(
+      "quizMaterialSelect"
+    );
+
+
+  const button =
+    document.getElementById(
+      "quizGenerateBtn"
+    );
+
+
+  const quizBox =
+    document.getElementById(
+      "quizBox"
+    );
+
+
+  const resultBox =
+    document.getElementById(
+      "quizResult"
+    );
+
+
+  if (!setup || !select || !button)
+    return;
+
+
+  button.addEventListener(
+    "click",
+    async () => {
+
+      const materialId =
+        select.value;
+
+
+      if (!materialId) {
+
+        showToast(
+          "error",
+          "Select a material",
+          "Choose a PDF first."
+        );
+
+        return;
+      }
+
+
+      state.selectedMaterial =
+        materialId;
+
+
+      button.disabled = true;
+
+      button.textContent =
+        "Generating...";
+
+
+      try {
+
+        const data =
+          await apiGenerateQuiz(
+            materialId
+          );
+
+
+        const content =
+          data.output ||
+          data.content ||
+          data.response ||
+          "No quiz returned.";
+
+
+        setup.style.display =
+          "none";
+
+
+        if (quizBox)
+          quizBox.hidden = false;
+
+
+        if (resultBox)
+          resultBox.hidden = true;
+
+
+        if (quizBox) {
+
+          quizBox.innerHTML = `
+
+                        <div class="output-card">
+
+                            <h4>
+                                ${escapeHtml(
+            data.title ||
+            "AI Quiz"
+          )}
+                            </h4>
+
+                            <div style="margin-top:1rem;">
+                                ${renderMarkdown(content)}
+                            </div>
+
+                            <div class="output-foot">
+
+                                <button
+                                    class="btn btn-ghost"
+                                    id="quizCopyBtn"
+                                >
+                                    Copy quiz
+                                </button>
+
+                            </div>
+
+                        </div>
+                    `;
+
+
+          document
+            .getElementById(
+              "quizCopyBtn"
+            )
+            ?.addEventListener(
+              "click",
+              () =>
+                copyToClipboard(
+                  content,
+                  "Quiz"
+                )
+            );
+        }
+
+
+        showToast(
+          "success",
+          "Quiz ready",
+          "Your workflow generated the quiz."
+        );
+
+
+      } catch (error) {
+
+        showToast(
+          "error",
+          "Quiz failed",
+          error.message
+        );
+
+
+      } finally {
+
+        button.disabled = false;
+
+        button.textContent =
+          "Start quiz";
+      }
     }
-    generateBtn.disabled = true;
-    generateBtn.textContent = "Preparing quiz…";
-    try {
-      const data = await apiGenerateQuiz(select.value);
-      state.quiz = { questions: data.questions, index: 0, answers: new Array(data.questions.length).fill(null), materialName: data.materialName };
-      setup.style.display = "none";
-      resultBox.hidden = true;
-      quizBox.hidden = false;
-      renderQuizQuestion();
-      showToast("success", "Quiz ready", `${data.questions.length} questions generated.`);
-    } catch (err) {
-      showToast("error", "Couldn't build quiz", "Please try again.");
-    } finally {
-      generateBtn.disabled = false;
-      generateBtn.textContent = "Start quiz";
-    }
-  });
-
-  function renderQuizQuestion() {
-    const { questions, index, answers } = state.quiz;
-    const q = questions[index];
-    progressLabel.textContent = `Question ${index + 1} of ${questions.length}`;
-    progressFill.style.width = `${((index + 1) / questions.length) * 100}%`;
-    questionEl.textContent = q.q;
-    const letters = ["A", "B", "C", "D"];
-    optionsEl.innerHTML = q.options
-      .map(
-        (opt, i) => `
-      <button class="quiz-option ${answers[index] === i ? "is-selected" : ""}" data-i="${i}">
-        <span class="opt-letter">${letters[i]}</span><span>${opt}</span>
-      </button>`
-      )
-      .join("");
-    optionsEl.querySelectorAll(".quiz-option").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.quiz.answers[index] = Number(btn.dataset.i);
-        renderQuizQuestion();
-      });
-    });
-    prevBtn.disabled = index === 0;
-    nextBtn.textContent = index === questions.length - 1 ? "See results" : "Next question";
-  }
-
-  prevBtn.addEventListener("click", () => {
-    if (state.quiz.index > 0) {
-      state.quiz.index -= 1;
-      renderQuizQuestion();
-    }
-  });
-
-  nextBtn.addEventListener("click", () => {
-    const { questions, index, answers } = state.quiz;
-    if (answers[index] === null || answers[index] === undefined) {
-      showToast("error", "Select an answer", "Choose an option before continuing.");
-      return;
-    }
-    if (index < questions.length - 1) {
-      state.quiz.index += 1;
-      renderQuizQuestion();
-    } else {
-      finishQuiz();
-    }
-  });
-
-  function finishQuiz() {
-    const { questions, answers } = state.quiz;
-    const correct = answers.filter((a, i) => a === questions[i].answer).length;
-    const pct = Math.round((correct / questions.length) * 100);
-    quizBox.hidden = true;
-    resultBox.hidden = false;
-    document.getElementById("scorePercent").textContent = `${pct}%`;
-    document.getElementById("scoreFraction").textContent = `${correct} / ${questions.length}`;
-    const circle = document.getElementById("scoreRingCircle");
-    const circumference = 377;
-    circle.style.strokeDashoffset = String(circumference - (circumference * pct) / 100);
-    const msg =
-      pct >= 80 ? "Excellent grasp of the material — keep this up." : pct >= 50 ? "Solid effort. Review the questions you missed and try again." : "Worth another pass through the material before your next attempt.";
-    document.getElementById("scoreMessage").textContent = msg;
-    showToast(pct >= 50 ? "success" : "info", "Quiz complete", `You scored ${correct} out of ${questions.length}.`);
-  }
-
-  retakeBtn.addEventListener("click", () => {
-    setup.style.display = "flex";
-    resultBox.hidden = true;
-    quizBox.hidden = true;
-  });
+  );
 }
 
-/* ---- Flashcards ---- */
+
+/* ============================================================
+   29. FLASHCARDS
+   ============================================================ */
+
 function initFlashcards() {
-  const select = document.getElementById("flashMaterialSelect");
-  const generateBtn = document.getElementById("flashGenerateBtn");
-  const deckWrap = document.getElementById("flashDeck");
-  const card = document.getElementById("flashcard");
-  const frontText = document.getElementById("flashFrontText");
-  const backText = document.getElementById("flashBackText");
-  const counter = document.getElementById("flashCounter");
-  const prevBtn = document.getElementById("flashPrevBtn");
-  const nextBtn = document.getElementById("flashNextBtn");
-  const shuffleBtn = document.getElementById("flashShuffleBtn");
 
-  generateBtn.addEventListener("click", async () => {
-    if (!select.value) {
-      showToast("error", "Pick a material", "Choose a file to generate flashcards from.");
-      return;
+  const select =
+    document.getElementById(
+      "flashMaterialSelect"
+    );
+
+
+  const button =
+    document.getElementById(
+      "flashGenerateBtn"
+    );
+
+
+  const deck =
+    document.getElementById(
+      "flashDeck"
+    );
+
+
+  if (!select || !button)
+    return;
+
+
+  button.addEventListener(
+    "click",
+    async () => {
+
+      const materialId =
+        select.value;
+
+
+      if (!materialId) {
+
+        showToast(
+          "error",
+          "Select a material",
+          "Choose a PDF first."
+        );
+
+        return;
+      }
+
+
+      state.selectedMaterial =
+        materialId;
+
+
+      button.disabled = true;
+
+      button.textContent =
+        "Generating...";
+
+
+      try {
+
+        const data =
+          await apiGenerateFlashcards(
+            materialId
+          );
+
+
+        const content =
+          data.output ||
+          data.content ||
+          data.response ||
+          "No flashcards returned.";
+
+
+        if (deck) {
+
+          deck.hidden = false;
+
+
+          deck.innerHTML = `
+
+                        <div class="output-card">
+
+                            <h4>
+                                ${escapeHtml(
+            data.title ||
+            "Flashcards"
+          )}
+                            </h4>
+
+                            <div style="margin-top:1rem;">
+                                ${renderMarkdown(content)}
+                            </div>
+
+                            <div class="output-foot">
+
+                                <button
+                                    class="btn btn-ghost"
+                                    id="flashCopyBtn"
+                                >
+                                    Copy flashcards
+                                </button>
+
+                            </div>
+
+                        </div>
+                    `;
+
+
+          document
+            .getElementById(
+              "flashCopyBtn"
+            )
+            ?.addEventListener(
+              "click",
+              () =>
+                copyToClipboard(
+                  content,
+                  "Flashcards"
+                )
+            );
+        }
+
+
+        showToast(
+          "success",
+          "Flashcards ready",
+          "Your workflow generated the flashcards."
+        );
+
+
+      } catch (error) {
+
+        showToast(
+          "error",
+          "Flashcards failed",
+          error.message
+        );
+
+
+      } finally {
+
+        button.disabled = false;
+
+        button.textContent =
+          "Generate deck";
+      }
     }
-    generateBtn.disabled = true;
-    generateBtn.textContent = "Generating…";
-    try {
-      const data = await apiGenerateFlashcards(select.value);
-      state.flashcards = { cards: data.cards, index: 0, materialName: data.materialName };
-      deckWrap.hidden = false;
-      renderCard();
-      showToast("success", "Deck ready", `${data.cards.length} flashcards generated.`);
-    } catch (err) {
-      showToast("error", "Couldn't build deck", "Please try again.");
-    } finally {
-      generateBtn.disabled = false;
-      generateBtn.textContent = "Generate deck";
-    }
-  });
-
-  function renderCard() {
-    const { cards, index } = state.flashcards;
-    card.classList.remove("is-flipped");
-    frontText.textContent = cards[index].front;
-    backText.textContent = cards[index].back;
-    counter.textContent = `Card ${index + 1} of ${cards.length}`;
-  }
-
-  card.addEventListener("click", () => card.classList.toggle("is-flipped"));
-
-  prevBtn.addEventListener("click", () => {
-    const { cards, index } = state.flashcards;
-    state.flashcards.index = index === 0 ? cards.length - 1 : index - 1;
-    renderCard();
-  });
-  nextBtn.addEventListener("click", () => {
-    const { cards, index } = state.flashcards;
-    state.flashcards.index = index === cards.length - 1 ? 0 : index + 1;
-    renderCard();
-  });
-  shuffleBtn.addEventListener("click", () => {
-    const { cards } = state.flashcards;
-    for (let i = cards.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cards[i], cards[j]] = [cards[j], cards[i]];
-    }
-    state.flashcards.index = 0;
-    renderCard();
-    showToast("info", "Deck shuffled", "Card order has been randomised.");
-  });
+  );
 }
 
-/* ---- Chat ---- */
+
+/* ============================================================
+   30. CHAT
+   ============================================================ */
+
 function initChat() {
-  const form = document.getElementById("chatForm");
-  const input = document.getElementById("chatInput");
-  const window_ = document.getElementById("chatWindow");
-  const typing = document.getElementById("chatTyping");
+
+  const form =
+    document.getElementById(
+      "chatForm"
+    );
+
+
+  const input =
+    document.getElementById(
+      "chatInput"
+    );
+
+
+  const windowElement =
+    document.getElementById(
+      "chatWindow"
+    );
+
+
+  const typing =
+    document.getElementById(
+      "chatTyping"
+    );
+
+
+  if (!form || !input || !windowElement)
+    return;
+
 
   if (!state.chatHistory.length) {
+
     state.chatHistory.push({
+
       role: "ai",
-      text: "Hi Ananya! I'm PadhAi. Ask me to summarise a chapter, quiz you, explain a concept, or anything else about your materials.",
+
+      text:
+        "Hi! I'm PadhAi. " +
+        "Select a material and ask me something about it.",
     });
   }
+
+
   renderChat();
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    state.chatHistory.push({ role: "user", text });
-    input.value = "";
-    renderChat();
-    typing.hidden = false;
-    window_.scrollTop = window_.scrollHeight;
 
-    try {
-      const { reply } = await apiSendChatMessage(text, state.chatHistory);
-      state.chatHistory.push({ role: "ai", text: reply });
-    } catch (err) {
-      state.chatHistory.push({ role: "ai", text: "Sorry, something went wrong on my end. Please try asking again." });
-    } finally {
-      typing.hidden = true;
+  form.addEventListener(
+    "submit",
+    async event => {
+
+      event.preventDefault();
+
+
+      const text =
+        input.value.trim();
+
+
+      if (!text)
+        return;
+
+
+      state.chatHistory.push({
+
+        role: "user",
+
+        text: text,
+      });
+
+
+      input.value = "";
+
+
       renderChat();
+
+
+      if (typing)
+        typing.hidden = false;
+
+
+      try {
+
+        const data =
+          await apiSendChatMessage(
+            text,
+            state.chatHistory,
+            state.selectedMaterial
+          );
+
+
+        state.chatHistory.push({
+
+          role: "ai",
+
+          text:
+            data.reply ||
+            data.response ||
+            data.output ||
+            "No response received.",
+        });
+
+
+      } catch (error) {
+
+        state.chatHistory.push({
+
+          role: "ai",
+
+          text:
+            `Error: ${error.message}`,
+        });
+
+      } finally {
+
+        if (typing)
+          typing.hidden = true;
+
+
+        renderChat();
+      }
     }
-  });
+  );
+
 
   function renderChat() {
-    window_.innerHTML = state.chatHistory
-      .map((m) => `<div class="msg ${m.role === "user" ? "msg-user" : "msg-ai"}">${escapeHtml(m.text)}</div>`)
-      .join("");
-    window_.scrollTop = window_.scrollHeight;
+
+    windowElement.innerHTML =
+      state.chatHistory
+        .map(message => `
+
+                    <div
+                        class="msg ${message.role === "user"
+            ? "msg-user"
+            : "msg-ai"
+          }"
+                    >
+                        ${escapeHtml(
+            message.text
+          )}
+                    </div>
+
+                `)
+        .join("");
+
+
+    windowElement.scrollTop =
+      windowElement.scrollHeight;
   }
 }
 
-/* ---- Settings ---- */
+
+/* ============================================================
+   31. SETTINGS
+   ============================================================ */
+
 function initSettings() {
-  const themeSwitch = document.getElementById("settingsThemeSwitch");
-  const compactSwitch = document.getElementById("compactSwitch");
-  const digestSwitch = document.getElementById("digestSwitch");
-  const saveBtn = document.getElementById("saveProfileBtn");
 
-  themeSwitch.addEventListener("click", toggleTheme);
+  const themeSwitch =
+    document.getElementById(
+      "settingsThemeSwitch"
+    );
 
-  compactSwitch.addEventListener("click", () => {
-    state.compactSidebar = !state.compactSidebar;
-    compactSwitch.classList.toggle("is-on", state.compactSidebar);
-    compactSwitch.setAttribute("aria-checked", state.compactSidebar);
-    document.querySelector(".sidebar").classList.toggle("is-compact", state.compactSidebar);
-  });
 
-  digestSwitch.addEventListener("click", () => {
-    const isOn = digestSwitch.classList.toggle("is-on");
-    digestSwitch.setAttribute("aria-checked", isOn);
-  });
+  const compactSwitch =
+    document.getElementById(
+      "compactSwitch"
+    );
 
-  saveBtn.addEventListener("click", () => {
-    showToast("success", "Profile saved", "Your changes have been saved.");
-  });
+
+  const digestSwitch =
+    document.getElementById(
+      "digestSwitch"
+    );
+
+
+  const saveButton =
+    document.getElementById(
+      "saveProfileBtn"
+    );
+
+
+  themeSwitch?.addEventListener(
+    "click",
+    toggleTheme
+  );
+
+
+  compactSwitch?.addEventListener(
+    "click",
+    () => {
+
+      state.compactSidebar =
+        !state.compactSidebar;
+
+
+      compactSwitch.classList.toggle(
+        "is-on",
+        state.compactSidebar
+      );
+
+
+      compactSwitch.setAttribute(
+        "aria-checked",
+        String(
+          state.compactSidebar
+        )
+      );
+
+
+      document
+        .querySelector(".sidebar")
+        ?.classList.toggle(
+          "is-compact",
+          state.compactSidebar
+        );
+    }
+  );
+
+
+  digestSwitch?.addEventListener(
+    "click",
+    () => {
+
+      const isOn =
+        digestSwitch.classList.toggle(
+          "is-on"
+        );
+
+
+      digestSwitch.setAttribute(
+        "aria-checked",
+        String(isOn)
+      );
+    }
+  );
+
+
+  saveButton?.addEventListener(
+    "click",
+    () => {
+
+      showToast(
+        "success",
+        "Profile saved",
+        "Your changes have been saved."
+      );
+    }
+  );
 }
 
-/* ---- Shared render helpers ---- */
-function renderSkeleton(lines) {
-  const widths = [95, 88, 92, 70, 80, 60];
-  return `<div class="skeleton">${Array.from({ length: lines })
-    .map((_, i) => `<div class="skeleton-line" style="width:${widths[i % widths.length]}%"></div>`)
-    .join("")}</div>`;
-}
 
-function renderErrorState(message) {
-  return `<div class="empty-state"><div class="empty-icon">⚠</div><h4>Something went wrong</h4><p>${message}</p></div>`;
-}
+/* ============================================================
+   32. NAVIGATION
+   ============================================================ */
 
-function copyToClipboard(text, label) {
-  navigator.clipboard
-    ?.writeText(text)
-    .then(() => showToast("success", "Copied", `${label} copied to clipboard.`))
-    .catch(() => showToast("error", "Copy failed", "Your browser blocked clipboard access."));
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-/* =========================================================
-   6. INIT
-   ========================================================= */
 function initNav() {
-  document.querySelectorAll(".nav-item").forEach((btn) => {
-    btn.addEventListener("click", () => goToView(btn.dataset.view));
-  });
-  document.querySelectorAll("[data-goto]").forEach((btn) => {
-    btn.addEventListener("click", () => goToView(btn.dataset.goto));
-  });
+
+  document
+    .querySelectorAll(".nav-item")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          goToView(
+            button.dataset.view
+          );
+        }
+      );
+    });
+
+
+  document
+    .querySelectorAll("[data-goto]")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          goToView(
+            button.dataset.goto
+          );
+        }
+      );
+    });
 }
+
+
+/* ============================================================
+   33. SIDEBAR
+   ============================================================ */
 
 function initSidebarToggle() {
-  const menuBtn = document.getElementById("menuBtn");
-  const closeBtn = document.getElementById("sidebarClose");
-  const scrim = document.getElementById("sidebarScrim");
-  menuBtn.addEventListener("click", () => document.body.classList.add("sidebar-open"));
-  closeBtn.addEventListener("click", () => document.body.classList.remove("sidebar-open"));
-  scrim.addEventListener("click", () => document.body.classList.remove("sidebar-open"));
+
+  const menuButton =
+    document.getElementById(
+      "menuBtn"
+    );
+
+
+  const closeButton =
+    document.getElementById(
+      "sidebarClose"
+    );
+
+
+  const scrim =
+    document.getElementById(
+      "sidebarScrim"
+    );
+
+
+  menuButton?.addEventListener(
+    "click",
+    () =>
+      document.body.classList.add(
+        "sidebar-open"
+      )
+  );
+
+
+  closeButton?.addEventListener(
+    "click",
+    () =>
+      document.body.classList.remove(
+        "sidebar-open"
+      )
+  );
+
+
+  scrim?.addEventListener(
+    "click",
+    () =>
+      document.body.classList.remove(
+        "sidebar-open"
+      )
+  );
 }
+
+
+/* ============================================================
+   34. THEME INITIALIZATION
+   ============================================================ */
 
 function initThemeToggle() {
-  document.getElementById("themeToggle").addEventListener("click", toggleTheme);
-  const saved = localStorage.getItem("padhai-theme");
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-  applyTheme(saved || (prefersDark ? "dark" : "light"));
+
+  document
+    .getElementById(
+      "themeToggle"
+    )
+    ?.addEventListener(
+      "click",
+      toggleTheme
+    );
+
+
+  const saved =
+    localStorage.getItem(
+      "padhai-theme"
+    );
+
+
+  const prefersDark =
+    window
+      .matchMedia?.(
+        "(prefers-color-scheme: dark)"
+      )
+      .matches;
+
+
+  applyTheme(
+    saved ||
+    (
+      prefersDark
+        ? "dark"
+        : "light"
+    )
+  );
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  initThemeToggle();
-  initNav();
-  initSidebarToggle();
-  populateMaterialSelects();
-  renderStats();
-  renderRecentMaterials();
-  renderMaterials();
-  initUpload();
-  initSummary();
-  initNotes();
-  initQuiz();
-  initFlashcards();
-  initChat();
-  initSettings();
-  goToView("dashboard");
 
-  setTimeout(() => {
-    showToast("info", "Welcome back", "You have 4 materials ready to study.");
-  }, 600);
-});
+/* ============================================================
+   35. SKELETON
+   ============================================================ */
+
+function renderSkeleton(count = 5) {
+
+  const widths = [
+    95,
+    88,
+    92,
+    75,
+    85,
+  ];
+
+
+  return `
+
+        <div class="skeleton">
+
+            ${Array.from(
+    { length: count }
+  )
+      .map(
+        (_, index) => `
+
+                        <div
+                            class="skeleton-line"
+                            style="width:${widths[
+          index %
+          widths.length
+          ]
+          }%"
+                        ></div>
+
+                    `
+      )
+      .join("")}
+
+        </div>
+    `;
+}
+
+
+/* ============================================================
+   36. ERROR STATE
+   ============================================================ */
+
+function renderErrorState(message) {
+
+  return `
+
+        <div class="empty-state">
+
+            <div class="empty-icon">
+                ⚠
+            </div>
+
+            <h4>
+                Something went wrong
+            </h4>
+
+            <p>
+                ${escapeHtml(message)}
+            </p>
+
+        </div>
+    `;
+}
+
+
+/* ============================================================
+   37. CLIPBOARD
+   ============================================================ */
+
+async function copyToClipboard(
+  text,
+  label
+) {
+
+  try {
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+
+    showToast(
+      "success",
+      "Copied",
+      `${label} copied to clipboard.`
+    );
+
+
+  } catch (error) {
+
+    showToast(
+      "error",
+      "Copy failed",
+      "Clipboard access was blocked."
+    );
+  }
+}
+
+
+/* ============================================================
+   38. TIME FORMAT
+   ============================================================ */
+
+function formatRelativeTime(value) {
+
+  if (!value)
+    return "Recently";
+
+
+  const date =
+    new Date(value);
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  )
+    return "Recently";
+
+
+  const difference =
+    Date.now() -
+    date.getTime();
+
+
+  const minutes =
+    Math.floor(
+      difference /
+      (1000 * 60)
+    );
+
+
+  if (minutes < 1)
+    return "Just now";
+
+
+  if (minutes < 60)
+    return `${minutes} min ago`;
+
+
+  const hours =
+    Math.floor(
+      minutes / 60
+    );
+
+
+  if (hours < 24)
+    return `${hours} hr ago`;
+
+
+  const days =
+    Math.floor(
+      hours / 24
+    );
+
+
+  if (days === 1)
+    return "Yesterday";
+
+
+  if (days < 7)
+    return `${days} days ago`;
+
+
+  return date.toLocaleDateString();
+}
+
+
+/* ============================================================
+   39. INITIALIZATION
+   ============================================================ */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  async () => {
+
+    console.log(
+      "PadhAi frontend starting..."
+    );
+
+
+    initThemeToggle();
+
+    initNav();
+
+    initSidebarToggle();
+
+    initUpload();
+
+    initSummary();
+
+    initNotes();
+
+    initQuiz();
+
+    initFlashcards();
+
+    initChat();
+
+    initSettings();
+
+
+    goToView(
+      "dashboard"
+    );
+
+
+    await refreshMaterials();
+
+
+    /*
+       Automatically select first material
+       if one exists.
+    */
+
+    if (state.materials.length) {
+
+      const first =
+        state.materials[0];
+
+
+      const firstId =
+        first.id ||
+        first.filename ||
+        first.name;
+
+
+      selectMaterialEverywhere(
+        firstId
+      );
+
+
+      showToast(
+        "info",
+        "Welcome back",
+        `${state.materials.length} material${state.materials.length === 1
+          ? ""
+          : "s"
+        } available.`
+      );
+
+    } else {
+
+      showToast(
+        "info",
+        "Get started",
+        "Upload a PDF to begin studying."
+      );
+    }
+
+
+    console.log(
+      "PadhAi frontend ready."
+    );
+  }
+);

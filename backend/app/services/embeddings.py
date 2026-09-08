@@ -4,16 +4,9 @@ from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
-
 load_dotenv()
 
 
-# ============================================================
-# PADHAI EMBEDDING SERVICE
-# ============================================================
 
 class EmbeddingService:
     """
@@ -37,9 +30,6 @@ class EmbeddingService:
             google_api_key=self.api_key,
         )
 
-    # ========================================================
-    # GET EMBEDDING MODEL
-    # ========================================================
 
     def get_embeddings(self):
         """
@@ -47,10 +37,6 @@ class EmbeddingService:
         """
 
         return self.embeddings
-
-    # ========================================================
-    # EMBED ONE TEXT
-    # ========================================================
 
     def embed_text(self, text: str):
         """
@@ -63,10 +49,6 @@ class EmbeddingService:
             )
 
         return self.embeddings.embed_query(text)
-
-    # ========================================================
-    # EMBED MULTIPLE TEXTS
-    # ========================================================
 
     def embed_documents(self, documents):
         """
@@ -89,10 +71,6 @@ class EmbeddingService:
             cleaned_documents
         )
 
-
-# ============================================================
-# TEST
-# ============================================================
 
 if __name__ == "__main__":
 

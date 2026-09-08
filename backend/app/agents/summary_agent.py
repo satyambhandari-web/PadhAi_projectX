@@ -11,33 +11,29 @@ from app.services.rag_service import RAGService
 load_dotenv()
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
 
 # Keep retrieved context small enough for Groq TPM limits.
 MAX_CONTEXT_CHARS = 6500
 
 
-# ============================================================
-# TOOL: RETRIEVE RELEVANT EDUCATIONAL CONTENT
-# ============================================================
-
 @tool
-def get_summary_content(query: str):
+def get_summary_content(
+    query: str,
+    material_id: str | None = None,
+):
     """
-    Retrieves relevant educational content from the vector database
-    for generating a study summary.
+    Retrieve relevant educational content from the selected
+    PDF in the vector database.
     """
 
     rag_service = RAGService()
 
-    retriever = rag_service.get_retriever()
+    retriever = rag_service.get_retriever(
+        material_id=material_id
+    )
 
     documents = retriever.invoke(query)
 
-    # Extract only the actual text from the documents.
-    # Do not send complete Document objects or metadata to the LLM.
     content = []
 
     for doc in documents:
@@ -49,33 +45,33 @@ def get_summary_content(query: str):
             if text and text.strip():
                 content.append(text.strip())
 
-    retrieved_content = "\n\n".join(content)
-
-    # --------------------------------------------------------
-    # Prevent Groq 413 / TPM errors
-    # --------------------------------------------------------
+    retrieved_content = "\n\n".join(
+        content
+    )
 
     if len(retrieved_content) > MAX_CONTEXT_CHARS:
 
-        retrieved_content = retrieved_content[:MAX_CONTEXT_CHARS]
+        retrieved_content = retrieved_content[
+            :MAX_CONTEXT_CHARS
+        ]
 
-        # Try to end at a complete line instead of cutting
-        # the educational material in the middle of a sentence.
-        last_newline = retrieved_content.rfind("\n")
+        last_newline = retrieved_content.rfind(
+            "\n"
+        )
 
         if last_newline > 100:
-            retrieved_content = retrieved_content[:last_newline]
+            retrieved_content = (
+                retrieved_content[:last_newline]
+            )
 
     if not retrieved_content.strip():
 
-        return "No relevant educational material was found."
+        return (
+            "No relevant educational material "
+            "was found."
+        )
 
     return retrieved_content
-
-
-# ============================================================
-# SUMMARY AGENT
-# ============================================================
 
 class SummaryAgent:
 
@@ -88,10 +84,6 @@ class SummaryAgent:
             api_key=os.getenv("GROQ_API_KEY")
         )
 
-        # ----------------------------------------------------
-        # Register tools
-        # ----------------------------------------------------
-
         self.tools = [
             get_summary_content
         ]
@@ -101,18 +93,12 @@ class SummaryAgent:
             for tool in self.tools
         }
 
-        # ----------------------------------------------------
-        # Bind tools to LLM
-        # ----------------------------------------------------
+      
 
         self.llm_with_tools = self.llm.bind_tools(
             self.tools
         )
 
-
-    # ========================================================
-    # AGENT NODE
-    # ========================================================
 
     def agent_node(self, state: dict) -> dict:
 
@@ -131,46 +117,43 @@ high-quality study summaries for engineering students.
 IMPORTANT INSTRUCTIONS:
 
 1. ALWAYS use the get_summary_content tool first to retrieve
-   relevant educational material.
+relevant educational material.
 
-2. Base the final summary strictly on the retrieved educational
-   material.
+2. When a material_id is provided, retrieve information ONLY
+from that selected study material.
 
-3. Do NOT use outside knowledge.
+3. Base the final summary strictly on the retrieved educational
+material.
 
-4. Do NOT invent facts, definitions, formulas, algorithms,
-   examples, or explanations that are not supported by the
-   retrieved material.
+4. Do NOT use outside knowledge.
 
-5. Respect the user's requested level of detail.
+5. Do NOT invent facts, definitions, formulas, algorithms,
+examples, or explanations that are not supported by the
+retrieved material.
 
-   - If the user asks for a concise summary, keep it short
-     and focused on the most important points.
+6. Respect the user's requested level of detail.
 
-   - If the user asks for a detailed summary, provide a
-     comprehensive explanation of the important material.
+7. Organize the final answer using clear headings and
+subheadings where appropriate.
 
-6. Organize the final answer using clear headings and
-   subheadings where appropriate.
+8. Include important definitions, concepts, algorithms,
+principles, formulas, and examples when they are present
+in the retrieved material.
 
-7. Include important definitions, concepts, algorithms,
-   principles, formulas, and examples when they are present
-   in the retrieved material.
+9. Include Python code examples only when they are present
+or clearly supported by the retrieved educational material.
 
-8. Include Python code examples only when they are present
-   or clearly supported by the retrieved educational material.
+10. Focus on concepts useful for engineering examinations.
 
-9. Focus on concepts useful for engineering examinations.
+11. Remove unnecessary repetition.
 
-10. Remove unnecessary repetition.
+12. Do not mention RAG, vector databases, retrieval,
+tools, LangChain, or internal processing.
 
-11. Do not mention RAG, vector databases, retrieval,
-    tools, LangChain, or internal processing.
+13. Do not include conversational introductions such as:
+"Here is your summary", "Sure", "Of course", etc.
 
-12. Do not include conversational introductions such as:
-    "Here is your summary", "Sure", "Of course", etc.
-
-13. Return only the educational summary.
+14. Return only the educational summary.
 
 IMPORTANT:
 For the first response, use the get_summary_content tool.
@@ -191,11 +174,6 @@ retrieved material has been provided.
             "messages": [response]
         }
 
-
-    # ========================================================
-    # TOOL NODE
-    # ========================================================
-
     def tool_node(self, state: dict) -> dict:
 
         messages = state["messages"]
@@ -214,11 +192,6 @@ retrieved material has been provided.
             "tool_calls",
             []
         )
-
-        # ----------------------------------------------------
-        # Execute every requested tool call
-        # ----------------------------------------------------
-
         for tool_call in tool_calls:
 
             tool_name = tool_call["name"]
@@ -266,12 +239,6 @@ retrieved material has been provided.
         return {
             "messages": tool_outputs
         }
-
-
-# ============================================================
-# DIRECT SUMMARY AGENT TEST
-# ============================================================
-
 if __name__ == "__main__":
 
     print()
@@ -296,10 +263,6 @@ if __name__ == "__main__":
 
     try:
 
-        # ----------------------------------------------------
-        # STEP 1: Ask agent to retrieve material
-        # ----------------------------------------------------
-
         print()
         print("Retrieving educational material...")
 
@@ -309,10 +272,7 @@ if __name__ == "__main__":
 
         first_message = response["messages"][0]
 
-        # ----------------------------------------------------
-        # STEP 2: Execute RAG tool
-        # ----------------------------------------------------
-
+        
         if first_message.tool_calls:
 
             print(
@@ -323,9 +283,6 @@ if __name__ == "__main__":
                 response
             )
 
-            # ------------------------------------------------
-            # STEP 3: Send retrieved material back to LLM
-            # ------------------------------------------------
 
             final_state = {
                 "messages": [
@@ -356,10 +313,6 @@ if __name__ == "__main__":
             )
 
         else:
-
-            # ------------------------------------------------
-            # Fallback
-            # ------------------------------------------------
 
             print()
             print("=" * 60)

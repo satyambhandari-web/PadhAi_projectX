@@ -12,16 +12,9 @@ from langchain_core.tools import tool
 from app.services.rag_service import RAGService
 
 
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
 
 load_dotenv()
 
-
-# ============================================================
-# TOOL: RETRIEVE EDUCATIONAL CONTENT FROM RAG
-# ============================================================
 
 @tool
 def get_educational_content(query: str):
@@ -38,10 +31,6 @@ def get_educational_content(query: str):
 
     return response
 
-
-# ============================================================
-# CONTENT GENERATOR AGENT
-# ============================================================
 
 class ContentGeneratorAgent:
 
@@ -71,9 +60,6 @@ class ContentGeneratorAgent:
         )
 
 
-    # ========================================================
-    # AGENT NODE
-    # ========================================================
 
     def agent_node(self, state: dict) -> dict:
 
@@ -164,10 +150,6 @@ IMPORTANT INSTRUCTIONS:
         }
 
 
-    # ========================================================
-    # TOOL NODE
-    # ========================================================
-
     def tool_node(self, state: dict) -> dict:
 
         messages = state["messages"]
@@ -215,9 +197,6 @@ IMPORTANT INSTRUCTIONS:
         }
 
 
-# ============================================================
-# TEST CONTENT GENERATOR AGENT
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -225,19 +204,8 @@ if __name__ == "__main__":
     print("=" * 50)
     print("       CONTENT GENERATOR AGENT STARTED")
     print("=" * 50)
-
-
-    # --------------------------------------------------------
-    # CREATE AGENT
-    # --------------------------------------------------------
-
     agent = ContentGeneratorAgent()
-
-
-    # --------------------------------------------------------
-    # USER REQUEST
-    # --------------------------------------------------------
-
+    
     user_query = (
         "Give me detailed educational content on Python Unit 1."
     )
@@ -250,12 +218,7 @@ if __name__ == "__main__":
             )
         ]
     }
-
-
-    # --------------------------------------------------------
-    # FIRST AGENT CALL
-    # --------------------------------------------------------
-
+    
     response = agent.agent_node(
         state
     )
@@ -266,19 +229,14 @@ if __name__ == "__main__":
     print(response)
 
 
-    # --------------------------------------------------------
-    # CHECK FOR TOOL CALL
-    # --------------------------------------------------------
-
+ 
     if response["messages"][0].tool_calls:
 
         print()
         print("===== RETRIEVING EDUCATIONAL CONTENT =====")
 
 
-        # ----------------------------------------------------
-        # RUN RAG TOOL
-        # ----------------------------------------------------
+ 
 
         tool_response = agent.tool_node(
             response
@@ -287,12 +245,7 @@ if __name__ == "__main__":
 
         print()
         print("Educational content retrieved successfully.")
-
-
-        # ----------------------------------------------------
-        # CREATE FINAL STATE
-        # ----------------------------------------------------
-
+        
         final_state = {
             "messages": [
                 HumanMessage(
@@ -304,21 +257,11 @@ if __name__ == "__main__":
                 *tool_response["messages"]
             ]
         }
-
-
-        # ----------------------------------------------------
-        # SECOND LLM CALL
-        # ----------------------------------------------------
-
+        
         final_response = agent.agent_node(
             final_state
         )
-
-
-        # ----------------------------------------------------
-        # DISPLAY FINAL CONTENT
-        # ----------------------------------------------------
-
+        
         print()
         print("=" * 50)
         print("           FINAL EDUCATIONAL CONTENT")

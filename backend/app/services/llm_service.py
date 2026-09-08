@@ -9,9 +9,6 @@ from langchain_groq import ChatGroq
 load_dotenv()
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
@@ -22,10 +19,6 @@ if not GROQ_API_KEY:
     )
 
 
-# ============================================================
-# LLM INITIALIZATION
-# ============================================================
-
 llm = ChatGroq(
     model="openai/gpt-oss-120b",
     temperature=0.3,
@@ -33,9 +26,6 @@ llm = ChatGroq(
 )
 
 
-# ============================================================
-# BASIC LLM FUNCTION
-# ============================================================
 
 def generate_response(
     prompt: str,
@@ -72,11 +62,6 @@ def generate_response(
     except Exception as e:
         raise RuntimeError(f"LLM generation failed: {str(e)}") from e
 
-
-# ============================================================
-# EDUCATIONAL SYSTEM PROMPT
-# ============================================================
-
 EDUCATIONAL_SYSTEM_PROMPT = """
 You are PadhAi, an intelligent AI educational assistant.
 
@@ -109,10 +94,6 @@ IMPORTANT RULES:
 15. Do not mention that you are an AI unless specifically asked.
 """
 
-
-# ============================================================
-# CONTEXT BUILDER
-# ============================================================
 
 def build_context_prompt(
     context: str,
@@ -162,9 +143,6 @@ Do not unnecessarily repeat the study material word-for-word.
 """
 
 
-# ============================================================
-# GENERAL EDUCATIONAL CONTENT
-# ============================================================
 
 def generate_educational_content(
     context: str,
@@ -187,9 +165,6 @@ def generate_educational_content(
     return generate_response(prompt)
 
 
-# ============================================================
-# SUMMARY
-# ============================================================
 
 def generate_summary(
     context: str,
@@ -204,11 +179,6 @@ def generate_summary(
         query=query,
         task="Detailed Summary",
     )
-
-
-# ============================================================
-# NOTES
-# ============================================================
 
 def generate_notes(
     context: str,
@@ -249,9 +219,6 @@ to understand the topic properly.
     return generate_response(prompt)
 
 
-# ============================================================
-# EXPLANATION
-# ============================================================
 
 def generate_explanation(
     context: str,
@@ -266,11 +233,6 @@ def generate_explanation(
         query=query,
         task="Concept Explanation",
     )
-
-
-# ============================================================
-# QUIZ GENERATOR
-# ============================================================
 
 def generate_quiz(
     context: str,
@@ -330,10 +292,6 @@ Explanation:
     return generate_response(prompt)
 
 
-# ============================================================
-# FLASHCARDS
-# ============================================================
-
 def generate_flashcards(
     context: str,
     number_of_cards: int = 15,
@@ -370,10 +328,6 @@ STUDY MATERIAL:
 
     return generate_response(prompt)
 
-
-# ============================================================
-# IMPORTANT QUESTIONS
-# ============================================================
 
 def generate_important_questions(
     context: str,
@@ -412,9 +366,6 @@ STUDY MATERIAL:
     return generate_response(prompt)
 
 
-# ============================================================
-# QUESTION ANSWERING
-# ============================================================
 
 def answer_question(
     context: str,
@@ -450,9 +401,6 @@ Instructions:
     return generate_response(prompt)
 
 
-# ============================================================
-# SIMPLIFY CONTENT
-# ============================================================
 
 def simplify_content(
     context: str,
@@ -490,10 +438,6 @@ STUDY MATERIAL:
     return generate_response(prompt)
 
 
-# ============================================================
-# STUDY PLAN
-# ============================================================
-
 def generate_study_plan(
     context: str,
     days: int = 7,
@@ -526,9 +470,6 @@ STUDY MATERIAL:
     return generate_response(prompt)
 
 
-# ============================================================
-# CONTENT GENERATOR DISPATCHER
-# ============================================================
 
 def generate_content(
     content_type: str,
@@ -602,9 +543,6 @@ def generate_content(
         )
 
 
-# ============================================================
-# LLM SERVICE TEST
-# ============================================================
 
 if __name__ == "__main__":
 

@@ -9,9 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# ============================================================
-# TOOL: Retrieve educational content from RAG / ChromaDB
-# ============================================================
 
 @tool
 def get_notes_content(query: str):
@@ -28,10 +25,6 @@ def get_notes_content(query: str):
 
     return documents
 
-
-# ============================================================
-# NOTES AGENT
-# ============================================================
 
 class NotesAgent:
 
@@ -60,10 +53,6 @@ class NotesAgent:
         self.llm_with_tools = self.llm.bind_tools(
             self.tools
         )
-
-    # ========================================================
-    # STEP 1: LLM decides to retrieve content
-    # ========================================================
 
     def agent_node(self, state: dict) -> dict:
 
@@ -139,10 +128,6 @@ class NotesAgent:
             "messages": [response]
         }
 
-    # ========================================================
-    # STEP 2: Execute RAG tool
-    # ========================================================
-
     def tool_node(self, state: dict) -> dict:
 
         messages = state["messages"]
@@ -187,10 +172,6 @@ class NotesAgent:
             "messages": tool_outputs
         }
 
-    # ========================================================
-    # STEP 3: Generate final notes
-    # ========================================================
-
     def generate_final_notes(
         self,
         original_messages,
@@ -213,10 +194,6 @@ class NotesAgent:
         return final_response
 
 
-# ============================================================
-# TEST NOTES AGENT
-# ============================================================
-
 if __name__ == "__main__":
 
     print("\n========================================")
@@ -236,10 +213,7 @@ if __name__ == "__main__":
         ]
     }
 
-    # --------------------------------------------------------
-    # STEP 1: Ask LLM to retrieve content
-    # --------------------------------------------------------
-
+   
     response = agent.agent_node(
         state
     )
@@ -247,10 +221,7 @@ if __name__ == "__main__":
     print("===== AGENT RESPONSE =====")
     print(response)
 
-    # --------------------------------------------------------
-    # STEP 2: Execute RAG tool
-    # --------------------------------------------------------
-
+   
     if response["messages"][0].tool_calls:
 
         tool_response = agent.tool_node(
@@ -260,10 +231,7 @@ if __name__ == "__main__":
         print("\n===== TOOL RESPONSE =====")
         print(tool_response)
 
-        # ----------------------------------------------------
-        # STEP 3: Generate final notes
-        # ----------------------------------------------------
-
+   
         final_response = agent.generate_final_notes(
             state["messages"],
             response,

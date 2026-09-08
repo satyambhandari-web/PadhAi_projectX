@@ -11,25 +11,13 @@ from app.agents.quiz_agent import QuizAgent
 from app.agents.summary_agent import SummaryAgent
 
 
-# ============================================================
-# PADHAI AGENT WORKFLOW
-# ============================================================
-
-
-# ------------------------------------------------------------
-# 1. WORKFLOW STATE
-# ------------------------------------------------------------
-
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     task: str
     query: str
     output: str
+    material_id: str | None
 
-
-# ------------------------------------------------------------
-# 2. TASK ROUTER
-# ------------------------------------------------------------
 
 def task_router(
     state: AgentState,
@@ -64,11 +52,6 @@ def task_router(
             f"Use content, notes, flashcards, quiz, or summary."
         )
 
-
-# ------------------------------------------------------------
-# 3. CONTENT GENERATOR ROUTER
-# ------------------------------------------------------------
-
 def route_content_generator(
     state: AgentState,
 ) -> Literal["content_generator_tools", "__end__"]:
@@ -87,10 +70,6 @@ def route_content_generator(
 
     return "__end__"
 
-
-# ------------------------------------------------------------
-# 4. NOTES ROUTER
-# ------------------------------------------------------------
 
 def route_notes(
     state: AgentState,
@@ -111,9 +90,6 @@ def route_notes(
     return "__end__"
 
 
-# ------------------------------------------------------------
-# 5. FLASHCARD ROUTER
-# ------------------------------------------------------------
 
 def route_flashcards(
     state: AgentState,
@@ -134,24 +110,6 @@ def route_flashcards(
     return "__end__"
 
 
-# ------------------------------------------------------------
-# 6. QUIZ ROUTER
-#
-# IMPORTANT:
-# Quiz is different from the other agents.
-#
-# Flow:
-#
-# quiz
-#   ↓
-# quiz_tools
-#   ↓
-# quiz_final
-#   ↓
-# END
-#
-# We DO NOT send quiz_tools back to quiz.
-# ------------------------------------------------------------
 
 def route_quiz(
     state: AgentState,
@@ -174,9 +132,6 @@ def route_quiz(
     return "__end__"
 
 
-# ------------------------------------------------------------
-# 7. SUMMARY ROUTER
-# ------------------------------------------------------------
 
 def route_summary(
     state: AgentState,
@@ -196,11 +151,6 @@ def route_summary(
 
     return "__end__"
 
-
-# ============================================================
-# 8. QUIZ FINAL GENERATION NODE
-# ============================================================
-
 def generate_quiz_final(state: AgentState) -> dict:
     """
     Generate the final quiz using the educational content
@@ -218,14 +168,7 @@ def generate_quiz_final(state: AgentState) -> dict:
             "No messages available for final quiz generation."
         )
 
-    # --------------------------------------------------------
-    # The quiz tool places the retrieved educational content
-    # into the conversation.
-    #
-    # Find the most recent message containing the retrieved
-    # educational material.
-    # --------------------------------------------------------
-
+    
     retrieved_content = None
 
     for message in reversed(messages):
@@ -246,15 +189,8 @@ def generate_quiz_final(state: AgentState) -> dict:
             "No educational material was retrieved for quiz generation."
         )
 
-    # --------------------------------------------------------
-    # Create QuizAgent
-    # --------------------------------------------------------
 
     quiz_agent = QuizAgent()
-
-    # --------------------------------------------------------
-    # Generate FINAL MCQ quiz
-    # --------------------------------------------------------
 
     final_quiz = quiz_agent.generate_final_quiz(
         topic=state["query"],
@@ -262,9 +198,6 @@ def generate_quiz_final(state: AgentState) -> dict:
         number_of_questions=10,
     )
 
-    # --------------------------------------------------------
-    # Return proper LangGraph state update
-    # --------------------------------------------------------
 
     return {
         "messages": [
@@ -274,9 +207,6 @@ def generate_quiz_final(state: AgentState) -> dict:
     }
 
 
-# ============================================================
-# 9. CREATE AGENTS
-# ============================================================
 
 content_generator_agent = ContentGeneratorAgent()
 notes_agent = NotesAgent()
@@ -285,16 +215,9 @@ quiz_agent = QuizAgent()
 summary_agent = SummaryAgent()
 
 
-# ============================================================
-# 10. CREATE WORKFLOW BUILDER
-# ============================================================
 
 workflow_builder = StateGraph(AgentState)
 
-
-# ============================================================
-# 11. ADD AGENT NODES
-# ============================================================
 
 workflow_builder.add_node(
     "content_generator",
@@ -358,9 +281,7 @@ workflow_builder.add_node(
 )
 
 
-# ============================================================
-# 12. START → TASK ROUTER
-# ============================================================
+
 
 workflow_builder.add_conditional_edges(
     START,
@@ -374,10 +295,6 @@ workflow_builder.add_conditional_edges(
     },
 )
 
-
-# ============================================================
-# 13. CONTENT GENERATOR ROUTING
-# ============================================================
 
 workflow_builder.add_conditional_edges(
     "content_generator",
@@ -394,10 +311,6 @@ workflow_builder.add_edge(
 )
 
 
-# ============================================================
-# 14. NOTES ROUTING
-# ============================================================
-
 workflow_builder.add_conditional_edges(
     "notes",
     route_notes,
@@ -413,9 +326,6 @@ workflow_builder.add_edge(
 )
 
 
-# ============================================================
-# 15. FLASHCARD ROUTING
-# ============================================================
 
 workflow_builder.add_conditional_edges(
     "flashcard",
@@ -431,10 +341,6 @@ workflow_builder.add_edge(
     "flashcard",
 )
 
-
-# ============================================================
-# 16. QUIZ ROUTING
-# ============================================================
 
 workflow_builder.add_conditional_edges(
     "quiz",
@@ -463,9 +369,6 @@ workflow_builder.add_edge(
 )
 
 
-# ============================================================
-# 17. SUMMARY ROUTING
-# ============================================================
 
 workflow_builder.add_conditional_edges(
     "summary",
@@ -482,16 +385,8 @@ workflow_builder.add_edge(
 )
 
 
-# ============================================================
-# 18. COMPILE WORKFLOW
-# ============================================================
-
 workflow = workflow_builder.compile()
 
-
-# ============================================================
-# 19. TEST WORKFLOW
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -501,26 +396,17 @@ if __name__ == "__main__":
 
     try:
 
-        # ----------------------------------------------------
-        # USER QUERY
-        # ----------------------------------------------------
 
         query = input(
             "\nEnter your query: "
         ).strip()
 
-        # ----------------------------------------------------
-        # TASK
-        # ----------------------------------------------------
 
         task = input(
             "Enter task "
             "(content / notes / flashcards / quiz / summary): "
         ).strip()
 
-        # ----------------------------------------------------
-        # VALIDATION
-        # ----------------------------------------------------
 
         if not query:
             raise ValueError(
@@ -532,10 +418,6 @@ if __name__ == "__main__":
                 "Task cannot be empty."
             )
 
-        # ----------------------------------------------------
-        # INITIAL STATE
-        # ----------------------------------------------------
-
         user_input: AgentState = {
             "messages": [
                 HumanMessage(
@@ -545,11 +427,8 @@ if __name__ == "__main__":
             "task": task,
             "query": query,
             "output": "",
+            "material_id": None,
         }
-
-        # ----------------------------------------------------
-        # RUN WORKFLOW
-        # ----------------------------------------------------
 
         print("\n" + "=" * 60)
         print("                 RUNNING WORKFLOW")
@@ -558,11 +437,6 @@ if __name__ == "__main__":
         result = workflow.invoke(
             user_input
         )
-
-        # ----------------------------------------------------
-        # FINAL OUTPUT
-        # ----------------------------------------------------
-
         print("\n" + "=" * 60)
         print("                 FINAL OUTPUT")
         print("=" * 60)
@@ -598,10 +472,6 @@ if __name__ == "__main__":
                 "Workflow completed but "
                 "produced no output."
             )
-
-        # ----------------------------------------------------
-        # SUCCESS
-        # ----------------------------------------------------
 
         print("\n" + "=" * 60)
         print("          WORKFLOW COMPLETED SUCCESSFULLY")
