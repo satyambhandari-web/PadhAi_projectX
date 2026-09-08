@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -5,6 +7,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from langchain_core.messages import HumanMessage
 
@@ -33,6 +36,36 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 MAX_PDF_TEXT = 60000
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print()
+    print("=" * 60)
+    print("                 PADHAI API")
+    print("=" * 60)
+    print()
+
+    print(f"Application:  {APP_NAME}")
+    print(f"Version:      {APP_VERSION}")
+    print()
+    print("Backend:      FastAPI")
+    print("Workflow:     LangGraph")
+    print("Agents:       Notes / Quiz / Content / Flashcards / Summary")
+    print("RAG:          Chroma")
+    print("TTS:          gTTS")
+    print()
+    print(f"Uploads:      {UPLOAD_DIR}")
+    print(f"Audio:        {GENERATED_AUDIO_DIR}")
+    print()
+    print("API running successfully.")
+    print("Docs: http://127.0.0.1:8000/docs")
+    print("=" * 60)
+    print()
+
+    yield
+
+    print()
+    print("PadhAi API shutting down...")
+
 
 app = FastAPI(
     title="PadhAi API",
@@ -42,27 +75,31 @@ app = FastAPI(
         "Summary, RAG and Text-to-Speech."
     ),
     version=APP_VERSION,
+    lifespan=lifespan,
 )
+
+# Configurable CORS
+default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+env_cors = os.getenv("CORS_ORIGINS")
+if env_cors:
+    custom_origins = [origin.strip() for origin in env_cors.split(",") if origin.strip()]
+    cors_origins = list(dict.fromkeys(default_origins + custom_origins))
+else:
+    cors_origins = default_origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        # Vite
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-
-        # React / other dev servers
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-
-        # Live Server
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-
-        # FastAPI itself
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -419,11 +456,25 @@ def execute_workflow(
             detail="Query cannot be empty.",
         )
 
-    if pdf_path:
+    if not pdf_path and UPLOAD_DIR.exists():
+        for uploaded_file in UPLOAD_DIR.iterdir():
+            if uploaded_file.is_file() and uploaded_file.suffix.lower() == ".pdf":
+                if uploaded_file.name.lower() in query.lower() or uploaded_file.stem.lower() in query.lower():
+                    pdf_path = uploaded_file
+                    break
 
-        pdf_text = extract_pdf_text(
-            pdf_path
-        )
+    effective_material_id = material_id or (pdf_path.name if pdf_path else None)
+
+    if pdf_path and effective_material_id:
+        try:
+            rag_service = RAGService()
+            if not rag_service.has_material(effective_material_id):
+                rag_service.generate_and_store_embeddings(
+                    pdf_path=str(pdf_path),
+                    material_id=effective_material_id,
+                )
+        except Exception as exc:
+            print(f"[RAG INDEX ERROR] Could not ensure embeddings: {exc}")
 
         workflow_query = f"""
 You are working inside PadhAi.
@@ -437,18 +488,7 @@ SELECTED STUDY MATERIAL:
 USER REQUEST:
 {query}
 
-IMPORTANT:
-Generate the requested educational output
-using the actual study material below.
-
---- BEGIN STUDY MATERIAL ---
-
-{pdf_text}
-
---- END STUDY MATERIAL ---
-
-Do not ask the user to provide the material again.
-Use the study material above to complete the task.
+Generate the requested educational content by retrieving relevant information from the selected study material.
 """.strip()
 
     else:
@@ -497,6 +537,8 @@ Generate the requested educational content.
 
                 "query": workflow_query,
 
+                "material_id": effective_material_id,
+
                 "output": "",
             }
         )
@@ -509,7 +551,10 @@ Generate the requested educational content.
         print("-" * 60)
         print("WORKFLOW COMPLETED")
         print("-" * 60)
-        print(output)
+        try:
+            print(output)
+        except Exception:
+            print(output.encode("ascii", "replace").decode("ascii"))
         print("-" * 60)
 
         return output
@@ -657,10 +702,7 @@ async def api_info():
     }
 
 
-@app.get("/materials")
-@app.get("/api/materials")
-async def get_materials():
-
+def get_materials_sync():
     files = get_uploaded_pdf_files()
 
     materials = []
@@ -747,6 +789,12 @@ async def get_materials():
         )
 
     return materials
+
+
+@app.get("/materials")
+@app.get("/api/materials")
+async def get_materials():
+    return await run_in_threadpool(get_materials_sync)
 
 
 async def save_uploaded_pdf(
@@ -927,7 +975,8 @@ async def run_workflow(
             request.material_id
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task=task,
         query=request.query,
         pdf_path=pdf_path,
@@ -946,24 +995,6 @@ async def run_workflow(
         ),
         "output": output,
         "content": output,
-    }
-
-    return {
-
-        "success":
-            True,
-
-        "task":
-            task,
-
-        "query":
-            request.query,
-
-        "output":
-            output,
-
-        "content":
-            output,
     }
 
 
@@ -1026,7 +1057,8 @@ async def run_material_agent(
             "Generate useful educational content from the selected study material.",
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task=task,
         query=query,
         pdf_path=pdf_path,
@@ -1148,7 +1180,8 @@ async def summary_without_material(
             detail="Please provide a topic or query.",
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task="summary",
         query=query,
     )
@@ -1192,7 +1225,8 @@ async def notes_without_material(
             detail="Please provide a topic or query.",
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task="notes",
         query=query,
     )
@@ -1236,7 +1270,8 @@ async def quiz_without_material(
             detail="Please provide a topic or query.",
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task="quiz",
         query=query,
     )
@@ -1280,7 +1315,8 @@ async def flashcards_without_material(
             detail="Please provide a topic or query.",
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task="flashcards",
         query=query,
     )
@@ -1324,7 +1360,8 @@ async def content_without_material(
             detail="Please provide a topic or query.",
         )
 
-    output = execute_workflow(
+    output = await run_in_threadpool(
+        execute_workflow,
         task="content",
         query=query,
     )
@@ -1383,16 +1420,17 @@ async def chat(
 
             pdf_path = None
 
-    output = execute_workflow(
-    task="content",
-    query=message,
-    pdf_path=pdf_path,
-    material_id=(
-        pdf_path.name
-        if pdf_path
-        else None
-    ),
-)
+    output = await run_in_threadpool(
+        execute_workflow,
+        task="content",
+        query=message,
+        pdf_path=pdf_path,
+        material_id=(
+            pdf_path.name
+            if pdf_path
+            else None
+        ),
+    )
 
     return {
 
@@ -1460,11 +1498,10 @@ async def generate_tts(
             )
         )
 
-        audio_path = (
-            tts_service.generate_audio(
-                text=text,
-                language=language,
-            )
+        audio_path = await run_in_threadpool(
+            tts_service.generate_audio,
+            text=text,
+            language=language,
         )
 
         filename = Path(
@@ -1554,7 +1591,8 @@ async def process_pdf(
 
         material_id = pdf_path.name
 
-        chunks = rag_service.generate_and_store_embeddings(
+        chunks = await run_in_threadpool(
+            rag_service.generate_and_store_embeddings,
             pdf_path=str(pdf_path),
             material_id=material_id,
         )
@@ -1582,106 +1620,35 @@ async def process_pdf(
             ),
         ) from exc
 
-@app.get("/stats")
-@app.get("/api/stats")
-async def get_stats():
-
-    pdf_files = (
-        get_uploaded_pdf_files()
-    )
-
+def get_stats_sync():
+    pdf_files = get_uploaded_pdf_files()
     audio_files = [
-
         file
+        for file in GENERATED_AUDIO_DIR.iterdir()
+        if file.is_file() and file.suffix.lower() == ".mp3"
+    ] if GENERATED_AUDIO_DIR.exists() else []
 
-        for file
-        in GENERATED_AUDIO_DIR.iterdir()
-
-        if file.is_file()
-    ]
+    total_pages = 0
+    for pdf_file in pdf_files:
+        try:
+            docs = load_pdf(str(pdf_file))
+            total_pages += len(docs)
+        except Exception:
+            pass
 
     return {
-
-        "success":
-            True,
-
+        "success": True,
         "stats": {
-
-            "total_materials":
-                len(pdf_files),
-
-            "total_audio":
-                len(audio_files),
+            "total_materials": len(pdf_files),
+            "total_audio": len(audio_files),
+            "total_pages": total_pages,
+            "active_agents": 5,
+            "system_status": "Operational",
         },
     }
 
 
-@app.on_event("startup")
-async def startup_event():
-
-    print()
-    print("=" * 60)
-    print("                 PADHAI API")
-    print("=" * 60)
-    print()
-
-    print(
-        f"Application:  {APP_NAME}"
-    )
-
-    print(
-        f"Version:      {APP_VERSION}"
-    )
-
-    print()
-    print(
-        "Backend:      FastAPI"
-    )
-
-    print(
-        "Workflow:     LangGraph"
-    )
-
-    print(
-        "Agents:       Notes / Quiz / Content / "
-        "Flashcards / Summary"
-    )
-
-    print(
-        "RAG:          Chroma"
-    )
-
-    print(
-        "TTS:          gTTS"
-    )
-
-    print()
-    print(
-        f"Uploads:      {UPLOAD_DIR}"
-    )
-
-    print(
-        f"Audio:        {GENERATED_AUDIO_DIR}"
-    )
-
-    print()
-    print(
-        "API running successfully."
-    )
-
-    print(
-        "Docs: http://127.0.0.1:8000/docs"
-    )
-
-    print("=" * 60)
-    print()
-
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-
-    print()
-    print(
-        "PadhAi API shutting down..."
-    )
+@app.get("/stats")
+@app.get("/api/stats")
+async def get_stats():
+    return await run_in_threadpool(get_stats_sync)
