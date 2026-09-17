@@ -19,22 +19,16 @@
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 40 40" width="26" height="26">
-          <path d="M8 30 L8 10 Q8 6 12 6 L28 6 Q32 6 32 10 L32 30" fill="none" stroke="currentColor" stroke-width="2.4"
-            stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M20 6 L20 34" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-          <path d="M20 13 L26 10.5 M20 18 L27 15.5 M20 23 L26 20.5" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" />
-          <circle cx="31" cy="9" r="2.6" fill="currentColor" />
-        </svg>
+        <img src="assets/padhai-logo.png" alt="PadhAi Logo" class="brand-logo">
       </span>
+
       <div class="brand-text">
         <span class="brand-name">Padh<span class="brand-accent">Ai</span></span>
         <span class="brand-tag">Study, sharper.</span>
       </div>
+
       <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">✕</button>
     </div>
-
     <nav class="nav" aria-label="Primary">
       <button class="nav-item is-active" data-view="dashboard">
         <span class="nav-icon">▤</span><span>Dashboard</span>
@@ -98,7 +92,7 @@
             </span>
           </span>
         </button>
-        <div class="avatar" title="TriOS_AI_Trinity">TRIO</div>
+        <div class="avatar" title="User Profile">U</div>
       </div>
     </header>
 
@@ -110,7 +104,7 @@
           <div class="hero-glow" aria-hidden="true"></div>
           <div class="hero-body">
             <span class="eyebrow">Welcome back</span>
-            <h2>Good evening,TriOS_AI_Trinity. Ready to turn today's reading into knowledge?</h2>
+            <h2>Welcome! Ready to turn today's reading into knowledge?</h2>
             <p>Drop in a chapter, a PDF, or your class notes — PadhAi will summarise it, quiz you on it, and hold what
               you've learned in one place.</p>
             <div class="hero-actions">
@@ -185,7 +179,7 @@
             <div class="upload-progress-bar">
               <div class="upload-progress-fill" id="uploadProgressFill"></div>
             </div>
-            <span id="uploadProgressLabel">Uploading chapter-4-thermodynamics.pdf…</span>
+            <span id="uploadProgressLabel">Uploading file…</span>
           </div>
         </div>
 
@@ -273,18 +267,28 @@
           </div>
 
           <div class="quiz-result" id="quizResult" hidden>
-            <div class="score-ring">
-              <svg viewBox="0 0 140 140" width="140" height="140">
-                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--border)" stroke-width="10" />
-                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--gold)" stroke-width="10" stroke-linecap="round"
-                  id="scoreRingCircle" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 70 70)" />
-              </svg>
-              <div class="score-ring-label"><strong id="scorePercent">0%</strong><span id="scoreFraction">0 / 5</span>
+            <div class="score-card">
+              <div class="score-ring">
+                <svg viewBox="0 0 140 140" width="140" height="140">
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="var(--border)" stroke-width="10" />
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="var(--gold)" stroke-width="10" stroke-linecap="round"
+                    id="scoreRingCircle" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 70 70)" />
+                </svg>
+                <div class="score-ring-label"><strong id="scorePercent">0%</strong><span id="scoreFraction">0 / 5</span>
+                </div>
+              </div>
+              <h3 id="scoreTitle">Nice work!</h3>
+              <p id="scoreMessage">Here's how you did.</p>
+              <div class="quiz-result-actions">
+                <button class="btn btn-primary" id="quizRetakeBtn">Retake quiz</button>
+                <button class="btn btn-secondary" id="quizChangeMaterialBtn">Choose another material</button>
               </div>
             </div>
-            <h3>Nice work, TriOS_AI_Trinity.</h3>
-            <p id="scoreMessage">Here's how you did.</p>
-            <button class="btn btn-primary" id="quizRetakeBtn">Retake quiz</button>
+
+            <div class="quiz-review-section" id="quizReviewSection">
+              <h4 class="quiz-review-title">Detailed Answers Review</h4>
+              <div class="quiz-review-list" id="quizReviewList"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -294,55 +298,86 @@
         <div class="panel generator-panel">
           <div class="panel-head">
             <h3>Flashcards</h3>
+            <span class="chip" id="flashCardCount">0 cards</span>
           </div>
-          <p class="panel-desc">Flip through AI-generated flashcards. Click a card to reveal the answer.</p>
+          <p class="panel-desc">Flip through AI-generated flashcards. Click any rounded card to reveal the answer.</p>
           <div class="generator-controls">
             <select id="flashMaterialSelect" class="select"></select>
             <button class="btn btn-primary" id="flashGenerateBtn">Generate deck</button>
           </div>
 
+          <!-- Rounded Square Flashcards Grid -->
+          <div class="flashcard-grid" id="flashcardGrid">
+            <div class="empty-state" style="grid-column: 1 / -1; width: 100%; text-align: center; padding: 3rem 1rem;">
+              <div class="empty-icon">▭</div>
+              <h4>No flashcards generated yet</h4>
+              <p>Select a material above and click "Generate deck" to create your rounded flashcard deck.</p>
+            </div>
+          </div>
+
           <div class="flash-deck" id="flashDeck" hidden>
             <div class="flash-meta">
-              <span id="flashCounter">Card 1 of 8</span>
-              <button class="link-btn" id="flashShuffleBtn">Shuffle deck</button>
+              <span id="flashCounter">Generated Deck</span>
+              <button class="link-btn" id="flashShuffleBtn">Shuffle cards</button>
             </div>
-            <div class="flashcard" id="flashcard">
-              <div class="flashcard-inner" id="flashcardInner">
-                <div class="flashcard-face flashcard-front">
-                  <span class="flashcard-tag">Term</span>
-                  <p id="flashFrontText"></p>
-                  <span class="flashcard-hint">Tap to flip</span>
-                </div>
-                <div class="flashcard-face flashcard-back">
-                  <span class="flashcard-tag">Answer</span>
-                  <p id="flashBackText"></p>
-                  <span class="flashcard-hint">Tap to flip back</span>
-                </div>
-              </div>
-            </div>
-            <div class="flash-controls">
-              <button class="btn btn-ghost" id="flashPrevBtn">← Previous</button>
-              <button class="btn btn-primary" id="flashNextBtn">Next →</button>
-            </div>
+            <div class="flashcard-grid" id="flashDeckGrid"></div>
           </div>
         </div>
       </section>
 
       <!-- ---------- AI CHAT ---------- -->
       <section class="view" id="view-chat">
-        <div class="panel chat-panel">
-          <div class="panel-head">
-            <h3>AI Chat</h3>
-            <span class="chip chip-live">● Online</span>
+        <div class="panel chat-panel" id="chatPanel">
+          <div class="panel-head chat-header-bar">
+            <div class="chat-header-title">
+              <h3>AI Chat</h3>
+              <span class="chip chip-live">● Online</span>
+            </div>
+
+            <!-- All Agents Toolbar Switcher -->
+            <div class="chat-agent-selector" id="chatAgentSelector">
+              <button type="button" class="agent-chip is-active" data-agent="chat"
+                title="Chat with General AI Assistant">
+                <span class="agent-icon">🤖</span><span>General AI</span>
+              </button>
+              <button type="button" class="agent-chip" data-agent="summary" title="Summarize study materials">
+                <span class="agent-icon">≣</span><span>Summary Agent</span>
+              </button>
+              <button type="button" class="agent-chip" data-agent="notes" title="Generate structured study notes">
+                <span class="agent-icon">✎</span><span>Notes Agent</span>
+              </button>
+              <button type="button" class="agent-chip" data-agent="quiz" title="Create auto-generated quizzes">
+                <span class="agent-icon">◈</span><span>Quiz Agent</span>
+              </button>
+              <button type="button" class="agent-chip" data-agent="flashcards" title="Build interactive flashcards">
+                <span class="agent-icon">▭</span><span>Flashcards Agent</span>
+              </button>
+            </div>
+
+            <div class="chat-header-actions">
+              <select id="chatMaterialSelect" class="select chat-select"
+                title="Select study material for chat context"></select>
+              <button class="icon-btn chat-fullscreen-btn" id="chatFullscreenBtn"
+                title="Toggle full browser screen chat" aria-label="Toggle full browser screen chat">
+                <span class="fs-icon-expand">⤢</span>
+                <span class="fs-icon-compress" style="display:none;">⤡</span>
+              </button>
+            </div>
           </div>
+
           <div class="chat-window" id="chatWindow"></div>
+
           <div class="chat-typing" id="chatTyping" hidden>
-            <span></span><span></span><span></span> PadhAi is thinking
+            <span class="chat-typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span class="chat-typing-label"><span id="typingAgentName">PadhAi AI Agent</span> is thinking...</span>
           </div>
+
           <form class="chat-input-row" id="chatForm">
-            <input type="text" id="chatInput"
-              placeholder="Ask about your materials, request a summary, or quiz yourself…" autocomplete="off">
-            <button type="submit" class="btn btn-primary" id="chatSendBtn">Send</button>
+            <div class="chat-input-wrapper">
+              <input type="text" id="chatInput"
+                placeholder="Ask about your materials, request a summary, or quiz yourself…" autocomplete="off">
+              <button type="submit" class="btn btn-primary" id="chatSendBtn">Send</button>
+            </div>
           </form>
         </div>
       </section>
@@ -355,18 +390,20 @@
               <h3>Profile</h3>
             </div>
             <div class="profile-row">
-              <div class="avatar avatar-lg">AR</div>
+              <div class="avatar avatar-lg">U</div>
               <div>
-                <strong>TriOS_AI_Trinity</strong>
-                <p>trios_ai_trinity@gmail.com· B.Tech, Semester 5</p>
+                <strong>Student User</strong>
+                <p>student@example.com · Course</p>
               </div>
             </div>
             <div class="form-grid">
-              <label>Full name<input type="text" class="text-input" value="TriOS_AI_Trinity"></label>
-              <label>Email<input type="email" class="text-input" value="trios_ai_trinity@gmail.com"></label>
-              <label>Institution<input type="text" class="text-input"
-                  value="G.H Raisoni College of Engineering and Management,Jalgaon"></label>
-              <label>Course<input type="text" class="text-input" value="B.Tech, Computer Science"></label>
+              <label>Full name<input type="text" class="text-input" value="Student User"
+                  placeholder="Your Full Name"></label>
+              <label>Email<input type="email" class="text-input" value="student@example.com"
+                  placeholder="email@example.com"></label>
+              <label>Institution<input type="text" class="text-input" value=""
+                  placeholder="Your University / College"></label>
+              <label>Course<input type="text" class="text-input" value="" placeholder="Your Course / Major"></label>
             </div>
             <button class="btn btn-primary" id="saveProfileBtn">Save changes</button>
           </div>

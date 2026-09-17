@@ -41,6 +41,8 @@ const state = {
   selectedMaterial: null,
 
   chatHistory: [],
+
+  activeChatAgent: "chat",
 };
 
 
@@ -256,23 +258,10 @@ async function apiRunWorkflow(
 ) {
 
   if (!materialId) {
-
     throw new Error(
       "Please select a material first."
     );
   }
-
-
-  /*
-     materialId is actually the PDF filename.
-
-     Example:
-
-     Python_Complete_Notes.pdf
-
-     We explicitly include the material name
-     in the workflow query.
-  */
 
   const material =
     state.materials.find(
@@ -281,49 +270,30 @@ async function apiRunWorkflow(
         String(materialId)
     );
 
-
   const filename =
     material?.filename ||
     material?.name ||
     materialId;
 
-
   let query;
 
-
   if (customQuery && customQuery.trim()) {
-
     query =
       `${customQuery.trim()}\n\n` +
       `Selected study material: ${filename}`;
-
   } else {
-
     const taskText = {
-
-      summary:
-        "Generate a clear and concise summary",
-
-      notes:
-        "Generate detailed exam-ready notes",
-
-      quiz:
-        "Generate a quiz with questions and answers",
-
-      flashcards:
-        "Generate useful study flashcards",
-
-      content:
-        "Generate educational learning content",
-
+      summary: "Generate a clear and concise summary",
+      notes: "Generate detailed exam-ready notes",
+      quiz: "Generate a quiz with questions and answers",
+      flashcards: "Generate useful study flashcards",
+      content: "Generate educational learning content",
     };
-
 
     query =
       `${taskText[task] || "Generate educational content"} ` +
       `from the selected study material: ${filename}`;
   }
-
 
   return apiRequest(
     "/api/workflow",
@@ -331,10 +301,9 @@ async function apiRunWorkflow(
       method: "POST",
 
       body: JSON.stringify({
-
         task: task,
-
         query: query,
+        material_id: filename,
       }),
     }
   );
@@ -443,13 +412,11 @@ async function apiSendChatMessage(
         String(materialId)
     );
 
-
   const filename =
     material?.filename ||
     material?.name ||
     materialId ||
     null;
-
 
   return apiRequest(
     "/api/chat",
@@ -457,14 +424,80 @@ async function apiSendChatMessage(
       method: "POST",
 
       body: JSON.stringify({
-
         message: message,
-
         filename: filename,
+        material_id: filename,
       }),
     }
   );
 }
+
+/* ============================================================
+   TTS & VECTOR PROCESS API & HELPERS
+   ============================================================ */
+
+async function apiGenerateTTS(text, language = "en") {
+  return apiRequest("/api/tts", {
+    method: "POST",
+    body: JSON.stringify({
+      text: text,
+      language: language,
+    }),
+  });
+}
+
+async function apiProcessPDF(filename) {
+  return apiRequest(`/api/process-pdf?filename=${encodeURIComponent(filename)}`, {
+    method: "POST",
+  });
+}
+
+async function apiGetStats() {
+  try {
+    return await apiRequest("/api/stats");
+  } catch (_) {
+    return null;
+  }
+}
+
+function renderTTSBar(text, containerId) {
+  return "";
+}
+
+async function handleTTSPlay(textVarName, containerId) {
+  const text = window[textVarName];
+  const langSelect = document.getElementById(`tts-lang-${containerId}`);
+  const lang = langSelect ? langSelect.value : "en";
+  const playerBox = document.getElementById(`tts-player-box-${containerId}`);
+  const playBtn = document.querySelector(`#tts-bar-${containerId} .tts-btn`);
+
+  if (!text) return;
+
+  if (playBtn) {
+    playBtn.disabled = true;
+    playBtn.innerHTML = `<span>⏳ Generating audio...</span>`;
+  }
+
+  try {
+    const data = await apiGenerateTTS(text, lang);
+    if (data && data.audio_url) {
+      const audioUrl = `${API_BASE_URL}${data.audio_url}`;
+      if (playerBox) {
+        playerBox.innerHTML = `<audio class="tts-player" controls autoplay src="${audioUrl}"></audio>`;
+      }
+      showToast("success", "Audio Ready", "Playing generated speech audio.");
+    }
+  } catch (error) {
+    showToast("error", "TTS Failed", error.message);
+  } finally {
+    if (playBtn) {
+      playBtn.disabled = false;
+      playBtn.innerHTML = `<span>▶ Listen / Play Speech</span>`;
+    }
+  }
+}
+
+window.handleTTSPlay = handleTTSPlay;
 
 
 /* ============================================================
@@ -915,6 +948,8 @@ function populateMaterialSelects() {
     "quizMaterialSelect",
 
     "flashMaterialSelect",
+
+    "chatMaterialSelect",
   ];
 
 
@@ -1043,40 +1078,46 @@ async function refreshMaterials() {
    21. STATS
    ============================================================ */
 
-function renderStats() {
+async function renderStats() {
 
   const grid =
     document.getElementById(
       "statsGrid"
     );
 
-
   if (!grid) return;
 
+  let totalAudio = 0;
+  let backendStatus = "Connected";
+
+  try {
+    const statsData = await apiGetStats();
+    if (statsData && statsData.stats) {
+      totalAudio = statsData.stats.total_audio || 0;
+    }
+  } catch (_) {
+    backendStatus = "Offline";
+  }
 
   const stats = [
-
     {
       icon: "▥",
       label: "Materials uploaded",
       value: state.materials.length,
       trend: "From your library",
     },
-
     {
-      icon: "≣",
+      icon: "☰",
       label: "Study materials ready",
       value: state.materials.length,
       trend: "Available now",
     },
-
     {
       icon: "◈",
       label: "AI tools available",
       value: "5",
       trend: "Summary · Notes · Quiz",
     },
-
     {
       icon: "▭",
       label: "Learning mode",
@@ -1084,7 +1125,6 @@ function renderStats() {
       trend: "Powered by your workflow",
     },
   ];
-
 
   grid.innerHTML =
     stats
@@ -1338,6 +1378,14 @@ function renderMaterials() {
                                 Flashcards
                             </button>
 
+                            <button
+                                class="pill-btn pill-btn-vector"
+                                data-action="process-pdf"
+                                data-id="${escapeHtml(id)}"
+                            >
+                                ⚡ Index Vector DB
+                            </button>
+
                         </div>
 
                     </div>
@@ -1349,46 +1397,41 @@ function renderMaterials() {
   grid
     .querySelectorAll(".pill-btn")
     .forEach(button => {
-
       button.addEventListener(
         "click",
-        () => {
+        async () => {
+          const action = button.dataset.action;
+          const id = button.dataset.id;
 
-          const action =
-            button.dataset.action;
+          if (action === "process-pdf") {
+            button.disabled = true;
+            button.textContent = "Indexing...";
+            try {
+              const data = await apiProcessPDF(id);
+              showToast("success", "Vector DB Indexed", `Created ${data.chunks || 0} embeddings for ${id}`);
+            } catch (err) {
+              showToast("error", "Indexing Failed", err.message);
+            } finally {
+              button.disabled = false;
+              button.textContent = "⚡ Index Vector DB";
+            }
+            return;
+          }
 
-
-          const id =
-            button.dataset.id;
-
-
-          selectMaterialEverywhere(id);
-
+          state.selectedMaterial = id;
 
           const selectMap = {
-
-            summary:
-              "summaryMaterialSelect",
-
-            quiz:
-              "quizMaterialSelect",
-
-            flashcards:
-              "flashMaterialSelect",
+            summary: "summaryMaterialSelect",
+            quiz: "quizMaterialSelect",
+            flashcards: "flashMaterialSelect",
           };
 
+          const select = document.getElementById(selectMap[action]);
+          if (select) select.value = id;
 
-          const select =
-            document.getElementById(
-              selectMap[action]
-            );
-
-
-          if (select)
-            select.value = id;
-
-
-          goToView(action);
+          if (selectMap[action]) {
+            goToView(action);
+          }
         }
       );
     });
@@ -2044,6 +2087,194 @@ function initQuiz() {
   if (!setup || !select || !button)
     return;
 
+  let questions = [];
+  let currentQuestion = 0;
+  let selectedAnswers = [];
+
+  const progressLabel = document.getElementById("quizProgressLabel");
+  const progressFill = document.getElementById("quizProgressFill");
+  const questionElement = document.getElementById("quizQuestion");
+  const optionsElement = document.getElementById("quizOptions");
+  const previousButton = document.getElementById("quizPrevBtn");
+  const nextButton = document.getElementById("quizNextBtn");
+  const changeMaterialBtn = document.getElementById("quizChangeMaterialBtn");
+  const reviewList = document.getElementById("quizReviewList");
+
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function parseQuizContent(text) {
+    const parsed = [];
+    const blocks = String(text || "")
+      .split(/(?=^\s*#{1,6}\s+Question\s+\d+\b|^\s*(?:Question\s*)?\d+\s*[:.)-])/im)
+      .map(block => block.trim())
+      .filter(Boolean);
+
+    blocks.forEach(block => {
+      const questionMatch = block.match(/\*\*Question:\*\*\s*(.+?)(?=\n|$)/i)
+        || block.match(/^(?:#{1,6}\s*)?(?:Question\s*)?\d+\s*[:.)-]\s*(.+?)(?=\n|$)/i);
+      if (!questionMatch) return;
+
+      const options = [];
+      const optionPattern = /^\s*\*{0,2}([A-D])\s*[).:-]\s*\*{0,2}\s*(.+?)\s*$/gim;
+      let optionMatch;
+      while ((optionMatch = optionPattern.exec(block))) {
+        options.push({ letter: optionMatch[1].toUpperCase(), text: optionMatch[2].trim() });
+      }
+      if (options.length < 2) return;
+
+      const answerMatch = block.match(/(?:correct\s*(?:answer|option)|answer)\s*:\s*\*{0,2}\s*([A-D])/i);
+      const explanationMatch = block.match(/(?:explanation|reason)\s*:\s*\*{0,2}\s*(.+?)(?=\n\n|\n[A-Z]\)|\nQuestion|$)/is);
+
+      parsed.push({
+        question: questionMatch[1].trim(),
+        options: options.slice(0, 4),
+        answer: answerMatch ? answerMatch[1].toUpperCase() : "",
+        explanation: explanationMatch ? explanationMatch[1].trim() : "",
+      });
+    });
+
+    return parsed;
+  }
+
+  function renderQuestion() {
+    const question = questions[currentQuestion];
+    if (!question || !questionElement || !optionsElement) return;
+
+    if (progressLabel) progressLabel.textContent = `Question ${currentQuestion + 1} of ${questions.length}`;
+    if (progressFill) progressFill.style.width = `${((currentQuestion + 1) / questions.length) * 100}%`;
+    questionElement.textContent = question.question;
+
+    optionsElement.innerHTML = question.options.map(option => `
+      <label class="quiz-option${selectedAnswers[currentQuestion] === option.letter ? " is-selected" : ""}">
+        <input type="checkbox" name="quiz-answer" value="${option.letter}" ${selectedAnswers[currentQuestion] === option.letter ? "checked" : ""}>
+        <span class="opt-letter">${option.letter}</span>
+        <span>${escapeHtml(option.text)}</span>
+      </label>
+    `).join("");
+
+    optionsElement.querySelectorAll("input").forEach(input => {
+      input.addEventListener("change", () => {
+        optionsElement.querySelectorAll("input").forEach(other => {
+          if (other !== input) other.checked = false;
+          other.closest(".quiz-option")?.classList.toggle("is-selected", other.checked);
+        });
+        selectedAnswers[currentQuestion] = input.checked ? input.value : "";
+      });
+    });
+
+    if (previousButton) previousButton.disabled = currentQuestion === 0;
+    if (nextButton) nextButton.textContent = currentQuestion === questions.length - 1 ? "Finish quiz" : "Next question";
+  }
+
+  function showQuizResult() {
+    const score = questions.reduce((total, question, index) => total + (selectedAnswers[index] === question.answer ? 1 : 0), 0);
+    if (quizBox) quizBox.hidden = true;
+    if (resultBox) resultBox.hidden = false;
+    const percent = Math.round((score / questions.length) * 100);
+
+    const scoreTitle = document.getElementById("scoreTitle");
+    if (scoreTitle) {
+      if (percent === 100) scoreTitle.textContent = "Perfect Score! 🌟";
+      else if (percent >= 80) scoreTitle.textContent = "Great Job! 🎉";
+      else if (percent >= 50) scoreTitle.textContent = "Good Effort! 👍";
+      else scoreTitle.textContent = "Keep Practicing! 💪";
+    }
+
+    document.getElementById("scorePercent")?.replaceChildren(document.createTextNode(`${percent}%`));
+    document.getElementById("scoreFraction")?.replaceChildren(document.createTextNode(`${score} / ${questions.length}`));
+    document.getElementById("scoreMessage")?.replaceChildren(document.createTextNode(`You answered ${score} of ${questions.length} questions correctly.`));
+    const ring = document.getElementById("scoreRingCircle");
+    if (ring) ring.style.strokeDashoffset = String(377 - (377 * percent / 100));
+
+    if (reviewList) {
+      reviewList.innerHTML = questions.map((q, idx) => {
+        const userAns = selectedAnswers[idx] || "None";
+        const isCorrect = userAns === q.answer;
+        const badgeHtml = isCorrect
+          ? `<span class="quiz-review-badge badge-correct">✓ Correct</span>`
+          : `<span class="quiz-review-badge badge-incorrect">✕ Incorrect</span>`;
+
+        const optionsReviewHtml = q.options.map(opt => {
+          let optClass = "";
+          let labelExtra = "";
+          if (opt.letter === userAns && isCorrect) {
+            optClass = "opt-user-correct";
+            labelExtra = " (Your answer - Correct)";
+          } else if (opt.letter === userAns && !isCorrect) {
+            optClass = "opt-user-wrong";
+            labelExtra = " (Your answer)";
+          } else if (opt.letter === q.answer && !isCorrect) {
+            optClass = "opt-target-correct";
+            labelExtra = " (Correct answer)";
+          }
+
+          return `<div class="quiz-review-opt ${optClass}">
+            <strong class="opt-letter">${opt.letter}</strong>
+            <span>${escapeHtml(opt.text)}${labelExtra}</span>
+          </div>`;
+        }).join("");
+
+        const expHtml = q.explanation
+          ? `<div class="quiz-review-exp"><strong>Explanation:</strong> ${escapeHtml(q.explanation)}</div>`
+          : "";
+
+        return `
+          <div class="quiz-review-item">
+            <div class="quiz-review-header">
+              <span class="quiz-review-q">Q${idx + 1}. ${escapeHtml(q.question)}</span>
+              ${badgeHtml}
+            </div>
+            <div class="quiz-review-opts">${optionsReviewHtml}</div>
+            ${expHtml}
+          </div>
+        `;
+      }).join("");
+    }
+  }
+
+  previousButton?.addEventListener("click", () => {
+    if (currentQuestion > 0) {
+      currentQuestion -= 1;
+      renderQuestion();
+    }
+  });
+
+  nextButton?.addEventListener("click", () => {
+    if (!selectedAnswers[currentQuestion]) {
+      showToast("info", "Select an answer", "Please choose an option with the checkbox before moving forward.");
+      return;
+    }
+    if (currentQuestion === questions.length - 1) showQuizResult();
+    else {
+      currentQuestion += 1;
+      renderQuestion();
+    }
+  });
+
+  document.getElementById("quizRetakeBtn")?.addEventListener("click", () => {
+    currentQuestion = 0;
+    selectedAnswers = [];
+    if (resultBox) resultBox.hidden = true;
+    if (quizBox) quizBox.hidden = false;
+    renderQuestion();
+  });
+
+  changeMaterialBtn?.addEventListener("click", () => {
+    currentQuestion = 0;
+    selectedAnswers = [];
+    questions = [];
+    if (resultBox) resultBox.hidden = true;
+    if (quizBox) quizBox.hidden = true;
+    if (setup) setup.style.display = "flex";
+  });
+
 
   button.addEventListener(
     "click",
@@ -2089,6 +2320,13 @@ function initQuiz() {
           data.response ||
           "No quiz returned.";
 
+        questions = parseQuizContent(content);
+        if (!questions.length) {
+          throw new Error("The generated quiz could not be read. Please try again.");
+        }
+        currentQuestion = 0;
+        selectedAnswers = [];
+
 
         setup.style.display =
           "none";
@@ -2102,51 +2340,7 @@ function initQuiz() {
           resultBox.hidden = true;
 
 
-        if (quizBox) {
-
-          quizBox.innerHTML = `
-
-                        <div class="output-card">
-
-                            <h4>
-                                ${escapeHtml(
-            data.title ||
-            "AI Quiz"
-          )}
-                            </h4>
-
-                            <div style="margin-top:1rem;">
-                                ${renderMarkdown(content)}
-                            </div>
-
-                            <div class="output-foot">
-
-                                <button
-                                    class="btn btn-ghost"
-                                    id="quizCopyBtn"
-                                >
-                                    Copy quiz
-                                </button>
-
-                            </div>
-
-                        </div>
-                    `;
-
-
-          document
-            .getElementById(
-              "quizCopyBtn"
-            )
-            ?.addEventListener(
-              "click",
-              () =>
-                copyToClipboard(
-                  content,
-                  "Quiz"
-                )
-            );
-        }
+        renderQuestion();
 
 
         showToast(
@@ -2182,149 +2376,162 @@ function initQuiz() {
    ============================================================ */
 
 function initFlashcards() {
+  const select = document.getElementById("flashMaterialSelect");
+  const button = document.getElementById("flashGenerateBtn");
+  const deck = document.getElementById("flashDeck");
+  const staticGrid = document.getElementById("flashcardGrid");
+  const deckGrid = document.getElementById("flashDeckGrid");
+  const shuffleBtn = document.getElementById("flashShuffleBtn");
 
-  const select =
-    document.getElementById(
-      "flashMaterialSelect"
-    );
+  // Enable flip interactivity for static initial cards
+  if (staticGrid) {
+    attachGridFlipEvents(staticGrid);
+  }
 
+  function attachGridFlipEvents(gridContainer) {
+    if (!gridContainer) return;
+    const cards = gridContainer.querySelectorAll(".flashcard-grid-item");
+    cards.forEach(card => {
+      card.onclick = function () {
+        this.classList.toggle("is-flipped");
+      };
+    });
+  }
 
-  const button =
-    document.getElementById(
-      "flashGenerateBtn"
-    );
+  if (shuffleBtn) {
+    shuffleBtn.addEventListener("click", () => {
+      const activeGrid = (deck && !deck.hidden && deckGrid) ? deckGrid : staticGrid;
+      if (!activeGrid) return;
+      const cards = Array.from(activeGrid.querySelectorAll(".flashcard-grid-item"));
+      cards.forEach(card => {
+        card.style.transition = "transform 0.25s ease, opacity 0.25s ease";
+        card.style.opacity = "0";
+        card.style.transform = "scale(0.85)";
+      });
+      setTimeout(() => {
+        cards.sort(() => Math.random() - 0.5);
+        cards.forEach(card => {
+          card.classList.remove("is-flipped");
+          activeGrid.appendChild(card);
+        });
+        setTimeout(() => {
+          cards.forEach(card => {
+            card.style.opacity = "1";
+            card.style.transform = "none";
+          });
+        }, 50);
+      }, 250);
+    });
+  }
 
+  if (!select || !button) return;
 
-  const deck =
-    document.getElementById(
-      "flashDeck"
-    );
+  button.addEventListener("click", async () => {
+    const materialId = select.value;
+    if (!materialId) {
+      showToast("error", "Select a material", "Choose a PDF first.");
+      return;
+    }
 
+    state.selectedMaterial = materialId;
+    button.disabled = true;
+    button.textContent = "Generating...";
 
-  if (!select || !button)
-    return;
+    try {
+      const data = await apiGenerateFlashcards(materialId);
+      const rawContent = data.output || data.content || data.response || "";
 
+      if (deck && deckGrid) {
+        const parsedCards = parseFlashcardsContent(rawContent);
 
-  button.addEventListener(
-    "click",
-    async () => {
+        if (parsedCards.length > 0) {
+          deckGrid.innerHTML = parsedCards.map(c => `
+            <div class="flashcard-grid-item">
+              <div class="flashcard-inner">
+                <div class="flashcard-face flashcard-front">
+                  <span class="flashcard-tag">${escapeHtml(c.tag || "Generated")}</span>
+                  <p>${escapeHtml(c.term)}</p>
+                  <span class="flashcard-hint">Tap to flip ↺</span>
+                </div>
+                <div class="flashcard-face flashcard-back">
+                  <span class="flashcard-tag">Answer</span>
+                  <p>${escapeHtml(c.answer)}</p>
+                  <span class="flashcard-hint">Tap to flip back ↺</span>
+                </div>
+              </div>
+            </div>
+          `).join("");
 
-      const materialId =
-        select.value;
-
-
-      if (!materialId) {
-
-        showToast(
-          "error",
-          "Select a material",
-          "Choose a PDF first."
-        );
-
-        return;
+          attachGridFlipEvents(deckGrid);
+          deck.hidden = false;
+          const countBadge = document.getElementById("flashCardCount");
+          if (countBadge) countBadge.textContent = `${parsedCards.length} cards`;
+        } else {
+          deckGrid.innerHTML = `
+            <div class="output-card" style="grid-column: 1 / -1;">
+              <h4>${escapeHtml(data.title || "Generated Flashcards")}</h4>
+              <div style="margin-top:1rem;">${renderMarkdown(rawContent)}</div>
+            </div>
+          `;
+          deck.hidden = false;
+        }
       }
 
+      showToast("success", "Flashcards ready", "Your rounded flashcard deck was generated.");
+    } catch (error) {
+      showToast("error", "Flashcards failed", error.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Generate deck";
+    }
+  });
 
-      state.selectedMaterial =
-        materialId;
+  function parseFlashcardsContent(text) {
+    if (!text) return [];
+    const results = [];
+    const lines = text.split("\n");
+    let currentTerm = "";
+    let currentAns = "";
 
+    for (let line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const termMatch = trimmed.match(/^(\*\*|\*)?(Q|Term|Card\s*\d+)?[\:\-\s]*([^\:\-]+)[\:\-]\s*(.+)?/i);
 
-      button.disabled = true;
-
-      button.textContent =
-        "Generating...";
-
-
-      try {
-
-        const data =
-          await apiGenerateFlashcards(
-            materialId
-          );
-
-
-        const content =
-          data.output ||
-          data.content ||
-          data.response ||
-          "No flashcards returned.";
-
-
-        if (deck) {
-
-          deck.hidden = false;
-
-
-          deck.innerHTML = `
-
-                        <div class="output-card">
-
-                            <h4>
-                                ${escapeHtml(
-            data.title ||
-            "Flashcards"
-          )}
-                            </h4>
-
-                            <div style="margin-top:1rem;">
-                                ${renderMarkdown(content)}
-                            </div>
-
-                            <div class="output-foot">
-
-                                <button
-                                    class="btn btn-ghost"
-                                    id="flashCopyBtn"
-                                >
-                                    Copy flashcards
-                                </button>
-
-                            </div>
-
-                        </div>
-                    `;
-
-
-          document
-            .getElementById(
-              "flashCopyBtn"
-            )
-            ?.addEventListener(
-              "click",
-              () =>
-                copyToClipboard(
-                  content,
-                  "Flashcards"
-                )
-            );
+      if (trimmed.toLowerCase().includes("q:") || trimmed.toLowerCase().includes("term:")) {
+        if (currentTerm && currentAns) {
+          results.push({ term: currentTerm, answer: currentAns, tag: "Study Term" });
+          currentTerm = "";
+          currentAns = "";
         }
-
-
-        showToast(
-          "success",
-          "Flashcards ready",
-          "Your workflow generated the flashcards."
-        );
-
-
-      } catch (error) {
-
-        showToast(
-          "error",
-          "Flashcards failed",
-          error.message
-        );
-
-
-      } finally {
-
-        button.disabled = false;
-
-        button.textContent =
-          "Generate deck";
+        currentTerm = trimmed.replace(/^(\*\*|\*)?(q|term|card \d+)[\:\s]*/i, "").replace(/(\*\*|\*)$/, "").trim();
+      } else if (trimmed.toLowerCase().includes("a:") || trimmed.toLowerCase().includes("answer:")) {
+        currentAns = trimmed.replace(/^(\*\*|\*)?(a|answer)[\:\s]*/i, "").replace(/(\*\*|\*)$/, "").trim();
+      } else if (currentTerm && !currentAns) {
+        currentTerm += " " + trimmed;
+      } else if (currentAns) {
+        currentAns += " " + trimmed;
       }
     }
-  );
+    if (currentTerm && currentAns) {
+      results.push({ term: currentTerm, answer: currentAns, tag: "Study Term" });
+    }
+
+    if (results.length === 0) {
+      const items = text.split(/\n\s*\n/);
+      items.forEach((chunk, i) => {
+        const parts = chunk.split(/[\:\n]/);
+        if (parts.length >= 2) {
+          results.push({
+            term: parts[0].replace(/^[\#\*\-\d\.\s]+/, "").trim(),
+            answer: parts.slice(1).join(" ").trim(),
+            tag: `Card ${i + 1}`
+          });
+        }
+      });
+    }
+    return results;
+  }
 }
 
 
@@ -2332,152 +2539,241 @@ function initFlashcards() {
    30. CHAT
    ============================================================ */
 
+const agentMap = {
+  chat: {
+    name: "General AI Agent",
+    icon: "🤖",
+    placeholder: "Ask about your materials, request a summary, or quiz yourself…",
+    systemPrefix: "",
+  },
+  summary: {
+    name: "Summary Agent",
+    icon: "≣",
+    placeholder: "Ask Summary Agent to summarize your materials or specific sections…",
+    systemPrefix: "[Task: Summary Agent] Please provide a clear, structured summary of: ",
+  },
+  notes: {
+    name: "Notes Agent",
+    icon: "✎",
+    placeholder: "Ask Notes Agent for exam-ready structured study notes…",
+    systemPrefix: "[Task: Notes Agent] Please generate structured study notes with key terms for: ",
+  },
+  quiz: {
+    name: "Quiz Agent",
+    icon: "◈",
+    placeholder: "Ask Quiz Agent to create questions or test your knowledge…",
+    systemPrefix: "[Task: Quiz Agent] Please create a multiple-choice quiz with explanations for: ",
+  },
+  flashcards: {
+    name: "Flashcards Agent",
+    icon: "▭",
+    placeholder: "Ask Flashcards Agent to create revision cards and key concepts…",
+    systemPrefix: "[Task: Flashcards Agent] Please generate key flashcard Q&A pairs for: ",
+  },
+};
+
 function initChat() {
+  const form = document.getElementById("chatForm");
+  const input = document.getElementById("chatInput");
+  const windowElement = document.getElementById("chatWindow");
+  const typing = document.getElementById("chatTyping");
+  const chatPanel = document.getElementById("chatPanel");
+  const fullscreenBtn = document.getElementById("chatFullscreenBtn");
+  const agentSelector = document.getElementById("chatAgentSelector");
 
-  const form =
-    document.getElementById(
-      "chatForm"
-    );
+  if (!form || !input || !windowElement) return;
 
+  // Agent switcher chip handlers
+  if (agentSelector) {
+    agentSelector.querySelectorAll(".agent-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        agentSelector.querySelectorAll(".agent-chip").forEach(c => c.classList.remove("is-active"));
+        chip.classList.add("is-active");
+        const agentKey = chip.dataset.agent || "chat";
+        state.activeChatAgent = agentKey;
 
-  const input =
-    document.getElementById(
-      "chatInput"
-    );
+        const agentInfo = agentMap[agentKey] || agentMap.chat;
+        input.placeholder = agentInfo.placeholder;
 
+        const typingName = document.getElementById("typingAgentName");
+        if (typingName) {
+          typingName.textContent = agentInfo.name;
+        }
 
-  const windowElement =
-    document.getElementById(
-      "chatWindow"
-    );
-
-
-  const typing =
-    document.getElementById(
-      "chatTyping"
-    );
-
-
-  if (!form || !input || !windowElement)
-    return;
-
-
-  if (!state.chatHistory.length) {
-
-    state.chatHistory.push({
-
-      role: "ai",
-
-      text:
-        "Hi! I'm PadhAi. " +
-        "Select a material and ask me something about it.",
+        showToast("info", `${agentInfo.icon} ${agentInfo.name} Active`, `Switched to ${agentInfo.name}.`);
+      });
     });
   }
 
+  // Full-screen mode toggle logic for agent chatbox
+  if (fullscreenBtn && chatPanel) {
+    fullscreenBtn.addEventListener("click", () => {
+      const isFS = chatPanel.classList.toggle("is-fullscreen");
+      document.body.classList.toggle("chat-fullscreen-active", isFS);
+
+      const expandIcon = fullscreenBtn.querySelector(".fs-icon-expand");
+      const compressIcon = fullscreenBtn.querySelector(".fs-icon-compress");
+
+      if (expandIcon && compressIcon) {
+        expandIcon.style.display = isFS ? "none" : "inline";
+        compressIcon.style.display = isFS ? "inline" : "none";
+      }
+
+      fullscreenBtn.title = isFS ? "Exit full browser screen chat" : "Toggle full browser screen chat";
+      showToast("info", isFS ? "Full Browser Screen Enabled" : "Full Screen Exited", isFS ? "Chatbox is occupying the full browser screen." : "Returned to default layout.");
+
+      if (windowElement) {
+        setTimeout(() => {
+          windowElement.scrollTop = windowElement.scrollHeight;
+        }, 100);
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && chatPanel.classList.contains("is-fullscreen")) {
+        chatPanel.classList.remove("is-fullscreen");
+        document.body.classList.remove("chat-fullscreen-active");
+        const expandIcon = fullscreenBtn.querySelector(".fs-icon-expand");
+        const compressIcon = fullscreenBtn.querySelector(".fs-icon-compress");
+        if (expandIcon && compressIcon) {
+          expandIcon.style.display = "inline";
+          compressIcon.style.display = "none";
+        }
+        fullscreenBtn.title = "Toggle full browser screen chat";
+      }
+    });
+  }
 
   renderChat();
 
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
 
-  form.addEventListener(
-    "submit",
-    async event => {
+    const currentAgent = state.activeChatAgent || "chat";
+    const agentInfo = agentMap[currentAgent] || agentMap.chat;
 
-      event.preventDefault();
+    state.chatHistory.push({
+      role: "user",
+      text: text,
+      agent: currentAgent,
+    });
 
+    input.value = "";
+    renderChat();
 
-      const text =
-        input.value.trim();
-
-
-      if (!text)
-        return;
-
-
-      state.chatHistory.push({
-
-        role: "user",
-
-        text: text,
-      });
-
-
-      input.value = "";
-
-
-      renderChat();
-
-
-      if (typing)
-        typing.hidden = false;
-
-
-      try {
-
-        const data =
-          await apiSendChatMessage(
-            text,
-            state.chatHistory,
-            state.selectedMaterial
-          );
-
-
-        state.chatHistory.push({
-
-          role: "ai",
-
-          text:
-            data.reply ||
-            data.response ||
-            data.output ||
-            "No response received.",
-        });
-
-
-      } catch (error) {
-
-        state.chatHistory.push({
-
-          role: "ai",
-
-          text:
-            `Error: ${error.message}`,
-        });
-
-      } finally {
-
-        if (typing)
-          typing.hidden = true;
-
-
-        renderChat();
-      }
+    const typingName = document.getElementById("typingAgentName");
+    if (typingName) {
+      typingName.textContent = agentInfo.name;
     }
-  );
+    if (typing) typing.hidden = false;
 
+    const chatSelect = document.getElementById("chatMaterialSelect");
+    const activeMaterialId = (chatSelect && chatSelect.value) ? chatSelect.value : state.selectedMaterial;
+
+    const promptText = agentInfo.systemPrefix ? `${agentInfo.systemPrefix}${text}` : text;
+
+    try {
+      const data = await apiSendChatMessage(promptText, state.chatHistory, activeMaterialId);
+      state.chatHistory.push({
+        role: "ai",
+        text: data.reply || data.response || data.output || "No response received.",
+        agent: currentAgent,
+      });
+    } catch (error) {
+      state.chatHistory.push({
+        role: "ai",
+        text: `Error: ${error.message}`,
+        agent: currentAgent,
+      });
+    } finally {
+      if (typing) typing.hidden = true;
+      renderChat();
+    }
+  });
 
   function renderChat() {
+    if (!state.chatHistory.length) {
+      windowElement.innerHTML = `
+        <div class="chat-welcome-box">
+          <div class="chat-welcome-icon">🤖</div>
+          <h3>Welcome to PadhAi AI Chat</h3>
+          <p>Select any AI Agent from the toolbar above and ask about your study materials.</p>
+          <div class="chat-starter-grid">
+            <button class="starter-pill" data-agent="summary" data-prompt="Summarize my uploaded study material in detail.">
+              <span class="starter-pill-icon">≣</span>
+              <span>Summarize study material</span>
+            </button>
+            <button class="starter-pill" data-agent="quiz" data-prompt="Generate a 5-question multiple choice quiz from my study material.">
+              <span class="starter-pill-icon">◈</span>
+              <span>Create 5-question quiz</span>
+            </button>
+            <button class="starter-pill" data-agent="notes" data-prompt="Generate exam-ready structured study notes with key terms.">
+              <span class="starter-pill-icon">✎</span>
+              <span>Generate structured notes</span>
+            </button>
+            <button class="starter-pill" data-agent="flashcards" data-prompt="Create key flashcards for revision.">
+              <span class="starter-pill-icon">▭</span>
+              <span>Create revision flashcards</span>
+            </button>
+          </div>
+        </div>
+      `;
 
-    windowElement.innerHTML =
-      state.chatHistory
-        .map(message => `
+      windowElement.querySelectorAll(".starter-pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+          const agentKey = pill.dataset.agent;
+          const prompt = pill.dataset.prompt;
 
-                    <div
-                        class="msg ${message.role === "user"
-            ? "msg-user"
-            : "msg-ai"
-          }"
-                    >
-                        ${escapeHtml(
-            message.text
-          )}
-                    </div>
+          if (agentKey && agentSelector) {
+            const targetChip = agentSelector.querySelector(`.agent-chip[data-agent="${agentKey}"]`);
+            if (targetChip) targetChip.click();
+          }
 
-                `)
-        .join("");
+          if (prompt && input) {
+            input.value = prompt;
+            form.dispatchEvent(new Event("submit"));
+          }
+        });
+      });
+      return;
+    }
 
+    windowElement.innerHTML = state.chatHistory
+      .map((message) => {
+        const isUser = message.role === "user";
+        const agentKey = message.agent || "chat";
+        const agentInfo = agentMap[agentKey] || agentMap.chat;
+        const formattedContent = isUser ? escapeHtml(message.text) : renderMarkdown(message.text);
 
-    windowElement.scrollTop =
-      windowElement.scrollHeight;
+        if (isUser) {
+          return `
+            <div class="msg-wrapper msg-user-wrapper">
+              <div class="msg msg-user">
+                <div>${formattedContent}</div>
+              </div>
+              <div class="msg-avatar user-avatar" title="You">U</div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="msg-wrapper msg-ai-wrapper">
+              <div class="msg-avatar ai-avatar" title="${escapeHtml(agentInfo.name)}">${agentInfo.icon}</div>
+              <div class="msg msg-ai">
+                <div class="msg-agent-tag">
+                  <span>${agentInfo.icon}</span>
+                  <span>${escapeHtml(agentInfo.name)}</span>
+                </div>
+                <div>${formattedContent}</div>
+              </div>
+            </div>
+          `;
+        }
+      })
+      .join("");
+
+    windowElement.scrollTop = windowElement.scrollHeight;
   }
 }
 
