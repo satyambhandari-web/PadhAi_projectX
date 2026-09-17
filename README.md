@@ -1,240 +1,232 @@
-PadhAi --- Smart Student Educational Content Generator
+# 📚 PadhAi - AI Powered Student Learning Assistant
 
 <p align="center">
 
-<strong>{=html}Learn Smarter. Revise Faster. Perform
-Better.</strong>{=html}
+<img src="https://img.shields.io/badge/Python-3.12+-blue?logo=python">
+<img src="https://img.shields.io/badge/Framework-FastAPI-009688?logo=fastapi">
+<img src="https://img.shields.io/badge/AI-LangGraph-orange">
+<img src="https://img.shields.io/badge/LLM-Groq-black?logo=groq">
+<img src="https://img.shields.io/badge/RAG-ChromaDB-purple">
+<img src="https://img.shields.io/badge/TTS-gTTS-green">
 
 </p>
 
 <p align="center">
 
-An AI-powered learning platform that transforms PDF study material into
-summaries, exam-ready notes, quizzes, flashcards, educational content,
-and voice output.
+<b>Learn Smarter. Generate Faster. Study Better.</b>
 
 </p>
 
-<p align="center">
+---
 
-<img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python">{=html}
-<img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi" alt="FastAPI">{=html}
-<img src="https://img.shields.io/badge/LangGraph-Agentic%20Workflow-orange" alt="LangGraph">{=html}
-<img src="https://img.shields.io/badge/RAG-ChromaDB-purple" alt="RAG">{=html}
-<img src="https://img.shields.io/badge/LLM-Groq-black" alt="Groq">{=html}
-<img src="https://img.shields.io/badge/Embeddings-Google%20Gemini-blue" alt="Gemini">{=html}
+# 📌 About PadhAi
 
-</p>
+**PadhAi** is an AI-powered student learning assistant that converts PDF study materials into intelligent and interactive learning resources.
 
-🚀 Overview
+Students can upload their study material and use AI to generate:
 
-PadhAi is a student-focused AI learning assistant designed to turn
-ordinary study PDFs into interactive learning resources.
+* 📝 Summaries
+* 📚 Study Notes
+* ❓ Practice Quizzes / MCQs
+* 🧠 Flashcards
+* 📖 Educational Content
+* 💬 AI-powered questions and answers
+* 🔊 Text-to-Speech learning content
 
-Instead of manually reading large documents and preparing revision
-material, students can upload a PDF and use AI-powered workflows to
-generate:
+PadhAi combines **Retrieval-Augmented Generation (RAG)**, **Large Language Models (LLMs)**, **Vector Databases**, and **Agentic AI workflows** to create a personalized learning experience.
 
-📝 Concise summaries
+---
 
-📚 Detailed exam-ready notes
+# ✨ Features
 
-❓ Practice quizzes / MCQs
+## 📄 PDF Based Learning
 
-🧠 Flashcards
+✅ Upload study PDFs
+✅ Extract content from documents
+✅ Process and chunk PDF text
+✅ Create a searchable AI knowledge base
+✅ Generate learning resources from uploaded material
 
-📖 Educational explanations and learning content
+---
 
-💬 Questions and answers based on study material
+## 🤖 AI Content Generation
 
-🔊 Text-to-speech audio
+| Feature              | Description                                   |
+| -------------------- | --------------------------------------------- |
+| 📝 Summary Generator | Creates concise summaries from study material |
+| 📚 Notes Generator   | Generates structured and exam-oriented notes  |
+| ❓ Quiz Generator     | Creates practice questions and MCQs           |
+| 🧠 Flashcards        | Generates quick revision flashcards           |
+| 📖 Content Generator | Generates educational explanations            |
+| 💬 AI Chat           | Answers questions using study material        |
 
-The application combines Retrieval-Augmented Generation (RAG),
-vector search, Large Language Models, and an agentic workflow
-powered by LangGraph.
+---
 
-🎯 Problem
+## 🔍 RAG Based AI System
 
-Students often spend significant time converting lengthy PDFs, lecture
-notes, and reference material into useful revision resources.
+PadhAi uses **Retrieval-Augmented Generation (RAG)** to retrieve relevant information from uploaded study materials before generating AI responses.
 
-PadhAi aims to reduce this effort by providing a single platform where
-students can:
-
-Upload their study material.
-
-Process the PDF automatically.
-
-Retrieve relevant information from the material.
-
-Generate different types of learning content.
-
-Revise using summaries, notes, quizzes, and flashcards.
-
-Listen to generated content using text-to-speech.
-
-✨ Key Features
-
-📄 PDF Upload & Processing
-
-Upload PDF study material through the web interface.
-
-Extract text from uploaded PDFs.
-
-Store uploaded materials for later use.
-
-Process documents for AI-powered content generation.
-
-🧠 Retrieval-Augmented Generation
-
-PadhAi uses RAG to ground AI responses in uploaded study material.
-
-The pipeline is:
-
-PDF
- ↓
+```text
+PDF Upload
+     |
+     ↓
 PDF Text Extraction
- ↓
+     |
+     ↓
 Text Chunking
- ↓
-Google Gemini Embeddings
- ↓
-ChromaDB Vector Store
- ↓
-Semantic Retrieval
- ↓
+     |
+     ↓
+Gemini Embeddings
+     |
+     ↓
+ChromaDB Vector Database
+     |
+     ↓
+Relevant Context Retrieval
+     |
+     ↓
 Groq LLM
- ↓
-Context-Aware Response
+     |
+     ↓
+AI Generated Learning Content
+```
 
-This allows the system to retrieve relevant document content before
-generating an answer.
+---
 
-🤖 Agentic AI Workflow
+# 🤖 Agentic AI Workflow
 
-PadhAi uses LangGraph to route requests to specialized AI agents.
+PadhAi uses **LangGraph** to organize AI tasks into specialized agents.
 
+```text
                     User Request
-                         │
-                         ▼
-                  LangGraph Router
-                         │
-       ┌─────────┬───────┼───────┬──────────┐
-       ▼         ▼       ▼       ▼          ▼
-   Summary     Notes    Quiz  Flashcards  Content
-     Agent      Agent   Agent    Agent      Agent
-       └─────────┴───────┼───────┴──────────┘
-                         ▼
-                    Generated Output
+                         |
+                         ↓
+                  LangGraph Workflow
+                         |
+        --------------------------------
+        |        |        |       |     |
+        ↓        ↓        ↓       ↓     ↓
+     Summary    Notes    Quiz  Flashcard Content
+      Agent     Agent   Agent    Agent    Agent
+        |        |        |       |       |
+        --------------------------------
+                         |
+                         ↓
+                   Generated Output
+```
 
-Specialized agents include:
+The system includes specialized agents for:
 
-SummaryAgent
+* 📝 Summary
+* 📚 Notes
+* ❓ Quiz
+* 🧠 Flashcards
+* 📖 Educational Content
 
-NotesAgent
+---
 
-QuizAgent
+# 🏗️ Project Architecture
 
-FlashcardAgent
+```text
+                       User
+                         |
+                         ↓
+                 HTML/CSS/JavaScript
+                         |
+                         ↓
+                    FastAPI
+                    Backend
+                         |
+              ---------------------
+              |                   |
+              ↓                   ↓
+        PDF Processing       AI Workflow
+              |                   |
+              ↓                   ↓
+          Text Chunks        LangGraph
+              |                   |
+              ↓          -------------------
+          Embeddings      |    |    |    |
+              |           ↓    ↓    ↓    ↓
+              ↓        Notes Quiz Summary
+          ChromaDB          Flashcards
+              |                   |
+              ---------------------
+                         |
+                         ↓
+                      Groq LLM
+                         |
+                         ↓
+                 Generated Content
+                         |
+                         ↓
+                       gTTS
+                         |
+                         ↓
+                  Voice Learning
+```
 
-ContentGeneratorAgent
+---
 
-💬 Study Material Chat
+# 🛠️ Tech Stack
 
-Students can ask questions about selected study material and receive
-AI-generated answers using the available document context.
+## Frontend
 
-🔊 Text-to-Speech
+* HTML5
+* CSS3
+* JavaScript
 
-Generated text can be converted into audio using gTTS, allowing
-students to listen to learning content.
+## Backend
 
-🎨 Student-Friendly Interface
+* Python
+* FastAPI
+* Uvicorn
+* Pydantic
 
-The frontend provides:
+## AI / ML
 
-Dashboard
+* LangChain
+* LangGraph
+* Groq API
+* Google Gemini Embeddings
+* Retrieval-Augmented Generation (RAG)
 
-Uploaded material management
+## Database
 
-Learning content generation
+* ChromaDB
 
-Chat interface
+## PDF Processing
 
-Settings
+* PyPDF
+* PDF text extraction
+* Text chunking
 
-Light/dark appearance
+## Text-to-Speech
 
-Golden/white and charcoal/gold visual design
+* gTTS (Google Text-to-Speech)
 
-🛠️ Technology Stack
+---
 
-Frontend
+# 📂 Project Structure
 
-HTML5
-
-CSS3
-
-JavaScript
-
-XMLHttpRequest / Fetch API
-
-Backend
-
-Python
-
-FastAPI
-
-Uvicorn
-
-Pydantic
-
-Python-dotenv
-
-Python Multipart
-
-AI & Agentic Layer
-
-LangChain
-
-LangGraph
-
-Groq LLM
-
-Google Gemini Embeddings
-
-RAG & Vector Database
-
-ChromaDB
-
-Recursive Character Text Splitter
-
-PyPDF / PyPDFLoader
-
-Semantic vector retrieval
-
-Text-to-Speech
-
-Google Text-to-Speech (gTTS)
-
-📂 Project Structure
-
+```text
 PadhAi/
 │
 ├── backend/
+│   │
 │   ├── app/
 │   │   ├── agents/
-│   │   │   ├── content_generator_agent.py
-│   │   │   ├── flashcard_agent.py
+│   │   │   ├── summary_agent.py
 │   │   │   ├── notes_agent.py
 │   │   │   ├── quiz_agent.py
-│   │   │   └── summary_agent.py
+│   │   │   ├── flashcard_agent.py
+│   │   │   └── content_generator_agent.py
 │   │   │
 │   │   ├── services/
-│   │   │   ├── embeddings.py
-│   │   │   ├── llm_service.py
-│   │   │   ├── pdf_service.py
 │   │   │   ├── rag_service.py
+│   │   │   ├── pdf_service.py
+│   │   │   ├── llm_service.py
+│   │   │   ├── embeddings.py
 │   │   │   └── tts_service.py
 │   │   │
 │   │   ├── workflows/
@@ -242,319 +234,345 @@ PadhAi/
 │   │   │
 │   │   └── main.py
 │   │
+│   ├── materials/
 │   ├── generated/
-│   ├── generated_audio/
-│   └── uploads/
+│   ├── audio/
+│   └── requirements.txt
 │
 ├── frontend/
+│   │
+│   ├── assets/
 │   ├── css/
 │   │   └── style.css
+│   │
 │   ├── js/
 │   │   └── script.js
+│   │
 │   └── index.html
 │
 ├── rag_chroma_db/
-├── requirements.txt
+│
 ├── .gitignore
 └── README.md
+```
 
-Important: Do not commit .env, uploaded PDFs, generated files,
-local virtual environments, or the Chroma database to a public
-repository. The included .gitignore is intended to keep these local
-resources out of Git.
+---
 
-⚙️ Installation
+# ⚙️ Installation
 
-1. Clone the Repository
+## Clone Repository
 
-git clone https://github.com/YOUR_USERNAME/PadhAi.git
+```bash
+git clone https://github.com/yourusername/PadhAi.git
+```
+
+## Navigate Project
+
+```bash
 cd PadhAi
+```
 
-2. Create a Python Virtual Environment
+## Create Virtual Environment
+
+```bash
+py -3.12 -m venv .venv
+```
+
+## Activate Environment
 
 Windows:
 
-py -3.12 -m venv .venv
+```powershell
 .venv\Scripts\activate
+```
 
 Linux/macOS:
 
-python3 -m venv .venv
+```bash
 source .venv/bin/activate
+```
 
-3. Install Dependencies
+## Install Dependencies
 
-pip install -r requirements.txt
+```bash
+pip install -r backend/requirements.txt
+```
 
-🔑 Environment Variables
+---
 
-Create a .env file in the project root/backend environment expected by
-your configuration.
+# 🔑 Environment Variables
 
-Example:
+Create a `.env` file and add your API keys:
 
+```env
 GROQ_API_KEY=your_groq_api_key
 GOOGLE_API_KEY=your_google_api_key
+```
 
-Never publish real API keys to GitHub.
+⚠️ **Never upload your `.env` file or API keys to GitHub.**
 
-▶️ Run the Backend
+---
 
-From the backend directory:
+# ▶️ Run Application
 
+## Start Backend
+
+Navigate to the backend:
+
+```bash
 cd backend
+```
+
+Run FastAPI:
+
+```bash
 uvicorn app.main:app --reload
+```
 
-The FastAPI backend will normally be available at:
+Backend will run at:
 
+```text
 http://127.0.0.1:8000
+```
 
-FastAPI's interactive API documentation is available at:
+API documentation:
 
+```text
 http://127.0.0.1:8000/docs
+```
 
-▶️ Run the Frontend
+---
 
-The frontend is a static HTML/CSS/JavaScript application.
+## Start Frontend
 
-From the frontend directory:
+Open another terminal:
 
+```bash
 cd frontend
+```
+
+Run the frontend server:
+
+```bash
 python -m http.server 5500
+```
 
-Then open:
+Open:
 
+```text
 http://localhost:5500
+```
 
-Make sure the backend is running on port 8000 while using the
-frontend.
+---
 
-🔌 API Overview
+# 🔌 API Endpoints
 
-The backend exposes APIs for the main learning workflows.
+| Endpoint             | Method   | Purpose                       |
+| -------------------- | -------- | ----------------------------- |
+| `/upload`            | POST     | Upload PDF                    |
+| `/api/uploads`       | GET      | Get uploaded materials        |
+| `/api/materials`     | GET      | Get available study materials |
+| `/api/chat`          | POST     | Chat with study material      |
+| `/api/workflow`      | POST     | Run AI workflow               |
+| `/api/analyze`       | POST     | Analyze study material        |
+| `/api/notes`         | GET/POST | Generate notes                |
+| `/api/summary`       | GET/POST | Generate summaries            |
+| `/api/quiz`          | GET/POST | Generate quizzes              |
+| `/api/flashcards`    | GET/POST | Generate flashcards           |
+| `/api/content`       | GET/POST | Generate educational content  |
+| `/api/tts`           | POST     | Generate speech               |
+| `/api/tts/languages` | GET      | Get available TTS languages   |
 
-Endpoint               Method     Purpose
+For the complete API specification, open:
 
-/api/upload          POST       Upload a PDF
-/api/materials       GET        List available study materials
-/api/workflow        POST       Run an AI learning workflow
-/api/chat            POST       Ask questions about study material
-/api/tts             POST       Convert generated text to audio
-/api/tts/languages   GET        Get supported TTS languages
-/api/notes           POST/GET   Notes-related operations
-/api/summary         POST/GET   Summary-related operations
-/api/quiz            POST/GET   Quiz-related operations
-/api/flashcards      POST/GET   Flashcard-related operations
-/api/content         POST/GET   Educational content operations
+```text
+http://127.0.0.1:8000/docs
+```
 
-The exact available routes can be inspected through the FastAPI Swagger
-documentation at /docs.
+---
 
-🔄 How PadhAi Works
+# 🔄 How PadhAi Works
 
-Step 1 --- Upload
+### 1️⃣ Upload
 
-The student uploads a study PDF.
+Student uploads a PDF containing study material.
 
-Step 2 --- Extract
+### 2️⃣ Process
 
-The backend extracts readable text from the PDF.
+The backend extracts text from the uploaded document.
 
-Step 3 --- Chunk & Embed
+### 3️⃣ Chunk
 
-The document is divided into smaller chunks and converted into vector
-embeddings using Google Gemini embeddings.
+The extracted text is divided into smaller chunks.
 
-Step 4 --- Store
+### 4️⃣ Embed
 
-The embeddings are stored in ChromaDB for semantic retrieval.
+The chunks are converted into vector embeddings using Gemini embeddings.
 
-Step 5 --- Retrieve
+### 5️⃣ Store
 
-When the student requests content or asks a question, relevant document
-information can be retrieved from the vector store.
+The embeddings are stored inside ChromaDB.
 
-Step 6 --- Agent Routing
+### 6️⃣ Retrieve
 
-LangGraph routes the request to the appropriate specialized agent:
+Relevant information is retrieved from the vector database when the student asks a question or requests learning content.
 
-Summary → Summary Agent
-Notes → Notes Agent
-Quiz → Quiz Agent
-Flashcards → Flashcard Agent
-Content → Content Generator Agent
+### 7️⃣ Generate
 
-Step 7 --- Generate
+The retrieved context is passed to the AI workflow and Groq LLM.
 
-The selected agent uses the LLM to generate the requested educational
-content.
+### 8️⃣ Learn
 
-Step 8 --- Optional Voice Output
+The generated output is displayed as:
 
-Generated content can be converted into speech using gTTS.
+```text
+Summary
+Notes
+Quiz
+Flashcards
+Educational Content
+```
 
-🧪 Example Workflow
+### 9️⃣ Listen
 
-Student
-   │
-   │ Upload Python Notes.pdf
-   ▼
-PadhAi Backend
-   │
-   ├── Extract PDF text
-   ├── Split into chunks
-   ├── Generate embeddings
-   └── Store in ChromaDB
-             │
-             ▼
-       Student selects
-       "Generate Quiz"
-             │
-             ▼
-       LangGraph Router
-             │
-             ▼
-          Quiz Agent
-             │
-             ▼
-          Groq LLM
-             │
-             ▼
-       Practice Quiz
+Text can also be converted into speech using gTTS.
 
-📸 Screenshots
+---
 
-Add screenshots of the application here:
+# 📊 Development Status
 
+| Component               | Status |
+| ----------------------- | ------ |
+| FastAPI Backend         | ✅      |
+| Frontend UI             | ✅      |
+| PDF Upload              | ✅      |
+| PDF Processing          | ✅      |
+| RAG Pipeline            | ✅      |
+| ChromaDB                | ✅      |
+| Gemini Embeddings       | ✅      |
+| Groq LLM                | ✅      |
+| Summary Agent           | ✅      |
+| Notes Agent             | ✅      |
+| Quiz Agent              | ✅      |
+| Flashcard Agent         | ✅      |
+| Content Generator Agent | ✅      |
+| Text-to-Speech          | ✅      |
+
+
+---
+
+# 📸 Screenshots
+
+Add your project screenshots here:
+
+```text
 screenshots/
+│
 ├── dashboard.png
 ├── upload.png
-├── notes.png
 ├── summary.png
+├── notes.png
 ├── quiz.png
 ├── flashcards.png
 └── chat.png
+```
 
 Example:
 
+```markdown
 ![PadhAi Dashboard](screenshots/dashboard.png)
+```
 
-🔒 Security Notes
+---
 
-Store API keys only in environment variables.
+# 🚀 Future Roadmap
 
-Do not commit .env files.
+## 📚 Learning Features
 
-Do not upload private student documents to a public repository.
+* [ ] Chat with multiple PDFs
+* [ ] Personalized study plans
+* [ ] AI Tutor Mode
+* [ ] Difficulty-based quizzes
+* [ ] Student progress tracking
+* [ ] Score history
+* [ ] Personalized revision recommendations
 
-Do not commit .venv/, __pycache__/, generated audio, or local
-vector databases.
+## 🌐 Accessibility & Language
 
-Review CORS settings before production deployment.
+* [ ] Multi-language AI responses
+* [ ] More TTS languages
+* [ ] Voice-based learning assistant
+* [ ] Improved accessibility
 
-Add authentication and authorization before deploying for multiple
-users.
+## 📤 Export
 
-🚧 Future Roadmap
+* [ ] Export notes as PDF
+* [ ] Export notes as DOCX
+* [ ] Download quizzes
+* [ ] Download flashcards
 
-📚 Learning
+## ☁️ Platform Improvements
 
-Multiple PDF support
+* [ ] User authentication
+* [ ] Cloud deployment
+* [ ] Cloud vector database
+* [ ] Persistent student profiles
+* [ ] Usage analytics
 
-Improved multi-document chat
+---
 
-Personalized study plans
+# 👨‍💻 Team
 
-Difficulty-based quizzes
+### Team PadhAi
 
-Progress and score tracking
+Developed by:
 
-Better revision recommendations
+* **Satyam**
+* **Om**
+* **Ritesh**
 
-🌐 Accessibility & Language
+**B.Tech Computer Science Engineering**
 
-More TTS languages
+**Agentic AI Project**
 
-Multilingual AI responses
+---
 
-Improved voice-learning experience
+# 🤝 Contribution
 
-Accessibility improvements
+Contributions are welcome!
 
-📤 Export
+1. Fork this repository
+2. Create a new branch
 
-Export notes as PDF
+```bash
+git checkout -b feature/new-feature
+```
 
-Export notes as DOCX
+3. Make your changes
+4. Commit your changes
 
-Download generated quizzes
+```bash
+git commit -m "Add new feature"
+```
 
-Download flashcards
+5. Push your branch
 
-☁️ Platform
+```bash
+git push origin feature/new-feature
+```
 
-User authentication
+6. Create a Pull Request
 
-Cloud database/vector storage
+---
 
-Production deployment
+# 📄 License
 
-Persistent user profiles
+This project is created for **educational and academic purposes**.
 
-Usage monitoring
-
-👥 Team
-
-PadhAi was developed as a collaborative academic project by:
-
-Satyam
-
-Om
-
-Ritesh
-
-B.Tech --- Computer Science Engineering
-
-🤝 Contributing
-
-Contributions and suggestions are welcome.
-
-Fork the repository.
-
-Create a feature branch.
-
-git checkout -b feature/your-feature
-
-Make your changes.
-
-Commit your changes.
-
-git commit -m "Add your feature"
-
-Push the branch.
-
-git push origin feature/your-feature
-
-Open a Pull Request.
-
-📄 License
-
-This project is developed for educational and academic purposes.
-
-If you plan to distribute or deploy PadhAi publicly, add an appropriate
-open-source license such as MIT and update this section accordingly.
-
-⭐ Project Vision
-
-PadhAi --- turning study material into an intelligent learning
-experience.
-
-The long-term vision is to build an AI-powered personal study assistant
-that understands a student's learning material and helps them learn,
-revise, practice, and listen from one platform.
+---
 
 <p align="center">
 
-Made with ❤️ by the PadhAi Team
+Made with ❤️ using Python, FastAPI, LangGraph, RAG, ChromaDB & Generative AI
 
 </p>
