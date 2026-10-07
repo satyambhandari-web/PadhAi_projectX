@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_classic.chains import RetrievalQA
 
@@ -26,6 +26,16 @@ class RAGService:
 
         # Chroma collection
         self.collection_name = "PadhAi_Materials"
+
+        # Local embedding model
+        self.embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+
+        # Create embedding model once and reuse it
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=self.embedding_model_name,
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True},
+        )
 
     def run_llm(
         self,
@@ -49,12 +59,6 @@ class RAGService:
     def process_pdf(self, pdf_path, material_id):
         """
         Load and split one selected PDF.
-
-        pdf_path:
-            Full path of the selected PDF.
-
-        material_id:
-            Unique ID identifying the selected PDF.
         """
 
         pdf_path = Path(pdf_path)
@@ -94,23 +98,29 @@ class RAGService:
 
     def has_material(self, material_id: str) -> bool:
         """
-        Check if Chroma vector store already contains documents for material_id.
+        Check if Chroma vector store already contains
+        documents for material_id.
         """
+
         if not material_id:
             return False
+
         try:
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/gemini-embedding-001",
-                google_api_key=os.getenv("GEMINI_API_KEY"),
-            )
             vector_store = Chroma(
-                embedding_function=embeddings,
+                embedding_function=self.embeddings,
                 persist_directory=str(self.persist_directory),
                 collection_name=self.collection_name,
             )
-            results = vector_store.get(where={"material_id": material_id}, limit=1)
+
+            results = vector_store.get(
+                where={"material_id": material_id},
+                limit=1,
+            )
+
             return len(results.get("ids", [])) > 0
-        except Exception:
+
+        except Exception as e:
+            print(f"[CHROMA CHECK ERROR] {e}")
             return False
 
     def generate_and_store_embeddings(
@@ -119,7 +129,7 @@ class RAGService:
         material_id,
     ):
         """
-        Create embeddings for the selected PDF
+        Create local embeddings for the selected PDF
         and store them in Chroma.
         """
 
@@ -128,13 +138,8 @@ class RAGService:
             material_id=material_id,
         )
 
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
-            google_api_key=os.getenv("GEMINI_API_KEY"),
-        )
-
         vector_store = Chroma(
-            embedding_function=embeddings,
+            embedding_function=self.embeddings,
             persist_directory=str(self.persist_directory),
             collection_name=self.collection_name,
         )
@@ -155,90 +160,172 @@ class RAGService:
         max_chars: int = 6000,
     ) -> str:
         """
-        Robustly retrieve educational content for a query and material_id.
-        Tries ChromaDB vector search first. If ChromaDB returns no content,
-        auto-indexes or loads text directly from the PDF file in uploads/.
+        Retrieve educational content for a query and material_id.
+
+        ChromaDB vector search is attempted first.
+        If retrieval fails, the original PDF text is used
+        as a fallback.
         """
+
         content_parts = []
 
-        # Auto-detect material_id from query if material_id is None
+        # Auto-detect material_id from query
         if not material_id and query and self.upload_dir.exists():
+
             for pdf_file in self.upload_dir.iterdir():
-                if pdf_file.is_file() and pdf_file.suffix.lower() == ".pdf":
-                    if pdf_file.name.lower() in query.lower() or pdf_file.stem.lower() in query.lower():
+
+                if (
+                    pdf_file.is_file()
+                    and pdf_file.suffix.lower() == ".pdf"
+                ):
+                    if (
+                        pdf_file.name.lower() in query.lower()
+                        or pdf_file.stem.lower() in query.lower()
+                    ):
                         material_id = pdf_file.name
                         break
 
+        # Auto-index PDF if necessary
         if material_id:
+
             pdf_path = self.upload_dir / Path(material_id).name
+
             if pdf_path.exists() and not self.has_material(material_id):
+
                 try:
+
                     self.generate_and_store_embeddings(
                         pdf_path=str(pdf_path),
                         material_id=material_id,
                     )
+
                 except Exception as e:
-                    print(f"[RAG AUTO-INDEX WARNING] {e}")
+
+                    print(
+                        f"[RAG AUTO-INDEX WARNING] {e}"
+                    )
 
         # Try ChromaDB retrieval
         try:
-            retriever = self.get_retriever(material_id=material_id)
-            docs = retriever.invoke(query or "key topics concepts definitions")
+
+            retriever = self.get_retriever(
+                material_id=material_id
+            )
+
+            docs = retriever.invoke(
+                query or "key topics concepts definitions"
+            )
+
             for doc in docs:
-                if hasattr(doc, "page_content") and doc.page_content and doc.page_content.strip():
-                    content_parts.append(doc.page_content.strip())
+
+                if (
+                    hasattr(doc, "page_content")
+                    and doc.page_content
+                    and doc.page_content.strip()
+                ):
+                    content_parts.append(
+                        doc.page_content.strip()
+                    )
+
         except Exception as e:
-            print(f"[RAG RETRIEVAL ERROR] {e}")
 
-        # Fallback to direct PDF text if ChromaDB returned empty content
+            print(
+                f"[RAG RETRIEVAL ERROR] {e}"
+            )
+
+        # Fallback to direct PDF text
         if not content_parts:
+
             if material_id:
-                pdf_path = self.upload_dir / Path(material_id).name
+
+                pdf_path = (
+                    self.upload_dir
+                    / Path(material_id).name
+                )
+
                 if pdf_path.exists():
-                    try:
-                        from app.services.pdf_service import extract_text_from_pdf
-                        pdf_text = extract_text_from_pdf(str(pdf_path))
-                        if pdf_text and pdf_text.strip():
-                            content_parts.append(pdf_text.strip())
-                    except Exception as e:
-                        print(f"[PDF FALLBACK ERROR] {e}")
 
-            # If still empty or material_id was not found, search all PDFs in uploads
-            if not content_parts and self.upload_dir.exists():
+                    try:
+
+                        from app.services.pdf_service import (
+                            extract_text_from_pdf
+                        )
+
+                        pdf_text = extract_text_from_pdf(
+                            str(pdf_path)
+                        )
+
+                        if pdf_text and pdf_text.strip():
+
+                            content_parts.append(
+                                pdf_text.strip()
+                            )
+
+                    except Exception as e:
+
+                        print(
+                            f"[PDF FALLBACK ERROR] {e}"
+                        )
+
+            # Search all PDFs if necessary
+            if (
+                not content_parts
+                and self.upload_dir.exists()
+            ):
+
                 for pdf_file in self.upload_dir.glob("*.pdf"):
-                    try:
-                        from app.services.pdf_service import extract_text_from_pdf
-                        pdf_text = extract_text_from_pdf(str(pdf_file))
-                        if pdf_text and pdf_text.strip():
-                            content_parts.append(f"--- {pdf_file.name} ---\n" + pdf_text.strip())
-                            break
-                    except Exception as e:
-                        print(f"[PDF FALLBACK ALL ERROR] {e}")
 
-        full_content = "\n\n".join(content_parts).strip()
+                    try:
+
+                        from app.services.pdf_service import (
+                            extract_text_from_pdf
+                        )
+
+                        pdf_text = extract_text_from_pdf(
+                            str(pdf_file)
+                        )
+
+                        if pdf_text and pdf_text.strip():
+
+                            content_parts.append(
+                                f"--- {pdf_file.name} ---\n"
+                                + pdf_text.strip()
+                            )
+
+                            break
+
+                    except Exception as e:
+
+                        print(
+                            f"[PDF FALLBACK ALL ERROR] {e}"
+                        )
+
+        full_content = "\n\n".join(
+            content_parts
+        ).strip()
+
         if len(full_content) > max_chars:
             full_content = full_content[:max_chars]
 
         if not full_content:
-            return "No relevant educational material was found for the selected topic."
+
+            return (
+                "No relevant educational material "
+                "was found for the selected topic."
+            )
 
         return full_content
 
     def create_retriever(self, material_id=None):
         """
-        Create a retriever.
+        Create a Chroma retriever.
 
-        If material_id is provided, retrieval should
-        be restricted to that selected material.
+        If material_id is provided, retrieval is restricted
+        to that selected material.
         """
 
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
-            google_api_key=os.getenv("GEMINI_API_KEY"),
-        )
-
         vector_store = Chroma(
-            embedding_function=embeddings,
+            embedding_function=self.embeddings,
             persist_directory=str(self.persist_directory),
             collection_name=self.collection_name,
         )
@@ -248,8 +335,9 @@ class RAGService:
             "fetch_k": 20,
         }
 
-        # Restrict retrieval to the selected PDF.
+        # Restrict retrieval to selected PDF
         if material_id:
+
             search_kwargs["filter"] = {
                 "material_id": material_id
             }
@@ -260,11 +348,15 @@ class RAGService:
         )
 
     def get_retriever(self, material_id=None):
+
         return self.create_retriever(
             material_id=material_id
         )
 
-    def get_llm(self, model="openai/gpt-oss-20b"):
+    def get_llm(
+        self,
+        model="openai/gpt-oss-20b"
+    ):
 
         llm = ChatGroq(
             model=model,
@@ -308,7 +400,7 @@ if __name__ == "__main__":
 
     rag_service = RAGService()
 
-    # Example PDF from backend/uploads/
+    # Example PDF
     pdf_path = (
         rag_service.upload_dir
         / "PYTHON U1 NOTES.pdf"
@@ -322,8 +414,12 @@ if __name__ == "__main__":
     )
 
     result = rag_service.create_rag_chain(
-        prompt="Give me a detailed summary of this Python Unit 1.",
+        prompt=(
+            "Give me a detailed summary "
+            "of this Python Unit 1."
+        ),
         material_id=material_id,
     )
 
     print(result)
+    

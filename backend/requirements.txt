@@ -70,6 +70,7 @@ jinja2
 python-dotenv
 langchain
 langchain-google-genai
+langchain-chroma
 chromadb
 pypdf
 faiss-cpu
