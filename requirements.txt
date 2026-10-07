@@ -1,35 +1,18 @@
-# Web Framework & Server
 fastapi
 uvicorn[standard]
 python-multipart
 jinja2
-pydantic
-pydantic-settings
-
-# LangChain & AI Integrations
+python-dotenv
 langchain
-langchain-core
 langchain-community
 langchain-chroma
 langchain-google-genai
 langchain-groq
 langgraph
-langsmith
 chromadb
 faiss-cpu
-
-# Documents & Audio
 pypdf
 gTTS
-
-# Database & Auth
 sqlalchemy
 passlib[bcrypt]
 python-jose[cryptography]
-
-# Utilities & Async
-python-dotenv
-httpx
-requests
-aiohttp
-typing-extensions
