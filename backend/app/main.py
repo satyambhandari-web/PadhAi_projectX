@@ -79,6 +79,7 @@ app = FastAPI(
 )
 
 # Configurable CORS
+# Configurable CORS
 default_origins = [
     "http://localhost:5000",
     "http://127.0.0.1:5000",
@@ -92,12 +93,25 @@ default_origins = [
     "http://127.0.0.1:5501",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+
+    # Production frontend
+    "https://padh-ai-project-x.vercel.app",
 ]
 
 env_cors = os.getenv("CORS_ORIGINS")
+
 if env_cors:
-    custom_origins = [origin.strip() for origin in env_cors.split(",") if origin.strip()]
-    cors_origins = list(dict.fromkeys(default_origins + custom_origins))
+    custom_origins = [
+        origin.strip()
+        for origin in env_cors.split(",")
+        if origin.strip()
+    ]
+
+    cors_origins = list(
+        dict.fromkeys(
+            default_origins + custom_origins
+        )
+    )
 else:
     cors_origins = default_origins
 
@@ -109,7 +123,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 app.mount(
