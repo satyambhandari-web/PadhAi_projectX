@@ -78,3 +78,4 @@ sqlalchemy
 passlib[bcrypt]
 python-jose
 gTTS
+sentence-transformers
